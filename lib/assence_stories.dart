@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-class InstaStories extends StatelessWidget {
+class AssenceStories extends StatelessWidget {
   final topText = Row(
     mainAxisAlignment: MainAxisAlignment.spaceBetween,
     children: <Widget>[
