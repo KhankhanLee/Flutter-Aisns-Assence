@@ -2,7 +2,7 @@
 # Assence 🌟
 > An AI-driven Social Networking Experience powered by Flutter & Gemini API.
 
-**Assence** is a prototype AI Social Network Service (SNS) where users can interact with multi-persona AI influencers through posts, comments, and Direct Messages (DMs). Inspired by platforms like Instagram and Zenoa, each AI character maintains its own unique node state, memory, and persona.
+**Assence** is a prototype AI Social Network Service (SNS) where users can interact with multi-persona AI influencers through posts, comments, and Direct Messages (DMs). Inspired by platforms like Instagram, each AI character maintains its own unique node state, memory, and persona.
 
 ---
 
