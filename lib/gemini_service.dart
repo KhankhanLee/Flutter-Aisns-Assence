@@ -53,27 +53,34 @@ class GeminiService {
 
     final Map<String, dynamic> decoded =
         jsonDecode(response.body) as Map<String, dynamic>;
-    final List<dynamic> candidates =
-        decoded['candidates'] as List<dynamic> ?? <dynamic>[];
+    final List<dynamic> candidates = decoded['candidates'] is List<dynamic>
+        ? decoded['candidates'] as List<dynamic>
+        : <dynamic>[];
 
     if (candidates.isEmpty) {
       return '응답을 생성하지 못했어요.';
     }
 
-    final Map<String, dynamic> firstCandidate =
-        candidates.first as Map<String, dynamic>;
-    final Map<String, dynamic> content =
-        firstCandidate['content'] as Map<String, dynamic> ?? <String, dynamic>{};
-    final List<dynamic> parts = content['parts'] as List<dynamic> ?? <dynamic>[];
+    final Map<String, dynamic> firstCandidate = candidates.first is Map<String, dynamic>
+        ? candidates.first as Map<String, dynamic>
+        : <String, dynamic>{};
+    final Map<String, dynamic> content = firstCandidate['content'] is Map<String, dynamic>
+        ? firstCandidate['content'] as Map<String, dynamic>
+        : <String, dynamic>{};
+    final List<dynamic> parts =
+        content['parts'] is List<dynamic> ? content['parts'] as List<dynamic> : <dynamic>[];
 
     if (parts.isEmpty) {
       return '응답을 생성하지 못했어요.';
     }
 
-    return parts
-        .map((dynamic part) => (part as Map<String, dynamic>)['text'] as String)
-        .where((String text) => text != null && text.isNotEmpty)
+    final String mergedText = parts
+        .map((dynamic part) =>
+            part is Map<String, dynamic> ? (part['text']?.toString() ?? '') : '')
+        .where((String text) => text.isNotEmpty)
         .join('\n')
         .trim();
+
+    return mergedText.isEmpty ? '응답을 생성하지 못했어요.' : mergedText;
   }
 }
