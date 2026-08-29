@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:assence/assence_body.dart';
+import 'package:assence/ai_chat_page.dart';
 
 class AssenceHome extends StatelessWidget {
   final topBar = new AppBar(
@@ -12,7 +13,16 @@ class AssenceHome extends StatelessWidget {
     actions: <Widget>[
       Padding(
         padding: const EdgeInsets.only(right: 12.0),
-        child: Icon(Icons.send),
+        child: Builder(
+          builder: (BuildContext context) => IconButton(
+            icon: Icon(Icons.send),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => AiChatPage()),
+              );
+            },
+          ),
+        ),
       )
     ],
   );
