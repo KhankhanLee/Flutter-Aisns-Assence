@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:flutter_insta_clone/insta_stories.dart';
+import 'package:assence/assence_stories.dart';
 
-class InstaList extends StatefulWidget {
+class AssenceList extends StatefulWidget {
   @override
-  _InstaListState createState() => _InstaListState();
+  _AssenceListState createState() => _AssenceListState();
 }
 
-class _InstaListState extends State<InstaList> {
+class _AssenceListState extends State<AssenceList> {
   bool isPressed = false;
 
   @override
@@ -17,7 +17,7 @@ class _InstaListState extends State<InstaList> {
       itemCount: 5,
       itemBuilder: (context, index) => index == 0
           ? new SizedBox(
-              child: new InstaStories(),
+              child: AssenceStories(),
               height: deviceSize.height * 0.15,
             )
           : Column(

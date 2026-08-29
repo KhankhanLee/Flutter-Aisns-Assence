@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:Assence/insta_home.dart';
+import 'package:assence/assence_home.dart';
 
 void main() => runApp(new MyApp());
 
@@ -18,7 +18,7 @@ class MyApp extends StatelessWidget {
           primaryTextTheme: TextTheme(
               bodyText1: TextStyle(color: Colors.black, fontFamily: "Aveny")),
           textTheme: TextTheme(bodyText1: TextStyle(color: Colors.black))),
-      home: new InstaHome(),
+      home: new AssenceHome(),
     );
   }
 }
