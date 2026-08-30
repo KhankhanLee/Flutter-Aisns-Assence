@@ -34,7 +34,8 @@ class _AiChatPageState extends State<AiChatPage> {
   String _selectedCharacterId = 'friend';
   bool _isLoading = false;
 
-  CharacterChatNode get _selectedNode => _characterNodes[_selectedCharacterId];
+  // 1. Map 조회 결과 뒤에 ! 추가
+  CharacterChatNode get _selectedNode => _characterNodes[_selectedCharacterId]!;
 
   Future<void> _sendMessage() async {
     final String userText = _controller.text.trim();
@@ -94,10 +95,13 @@ class _AiChatPageState extends State<AiChatPage> {
                           ),
                         )
                         .toList(),
-                    onChanged: (String value) {
-                      setState(() {
-                        _selectedCharacterId = value;
-                      });
+                    // 2. String? 타입 명시 및 null 처리
+                    onChanged: (String? value) {
+                      if (value != null) {
+                        setState(() {
+                          _selectedCharacterId = value;
+                        });
+                      }
                     },
                   ),
                 ),
