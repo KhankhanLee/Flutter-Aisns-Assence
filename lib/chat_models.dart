@@ -11,8 +11,12 @@ class CharacterChatNode {
   final String persona;
   final List<ChatMessage> history;
 
-  CharacterChatNode(this.id, this.name, this.persona, {List<ChatMessage> history})
-      : history = history ?? <ChatMessage>[];
+  CharacterChatNode(
+    this.id, 
+    this.name, 
+    this.persona, 
+    {List<ChatMessage>? history}
+  ) : history = history ?? <ChatMessage>[];
 
   void addUserMessage(String text) {
     history.add(ChatMessage('user', text));
