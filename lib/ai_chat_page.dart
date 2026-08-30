@@ -1,10 +1,12 @@
+import 'package:flutter/material.dart';
 import 'package:assence/chat_models.dart';
 import 'package:assence/gemini_service.dart';
-import 'package:flutter/material.dart';
 
 class AiChatPage extends StatefulWidget {
+  const AiChatPage({super.key});
+
   @override
-  _AiChatPageState createState() => _AiChatPageState();
+  State<AiChatPage> createState() => _AiChatPageState();
 }
 
 class _AiChatPageState extends State<AiChatPage> {
@@ -12,30 +14,106 @@ class _AiChatPageState extends State<AiChatPage> {
       GeminiService(apiKey: const String.fromEnvironment('GEMINI_API_KEY'));
   final TextEditingController _controller = TextEditingController();
 
-  final Map<String, CharacterChatNode> _characterNodes =
-      <String, CharacterChatNode>{
-    'friend': CharacterChatNode(
-      'friend',
-      '공감 친구',
-      '사용자의 감정을 따뜻하게 공감하고 짧고 명확한 조언을 제공하는 친구처럼 대화해.',
+  // 기본 여성 SNS 캐릭터 4인방 및 유저 커스텀 노드 저장 맵
+  final Map<String, CharacterChatNode> _characterNodes = <String, CharacterChatNode>{
+    'hayeon': CharacterChatNode(
+      id: 'hayeon',
+      name: '하연',
+      bio: '일상 · 감성 피드 ✨',
+      persona: '너는 인스타에서 인플루언서로 활동하는 20대 여성 "하연"이야. 말투는 다정하고 이모지를 자주 써. 사용자의 고민이나 일상에 따뜻하게 공감해줘.',
     ),
-    'coach': CharacterChatNode(
-      'coach',
-      '성장 코치',
-      '실행 가능한 단계 중심으로 답변하고 사용자가 바로 행동할 수 있게 도와줘.',
+    'suyeon': CharacterChatNode(
+      id: 'suyeon',
+      name: '수연',
+      bio: '갓생 · 운동 멘토 🔥',
+      persona: '너는 갓생을 사는 헬스 트레이너 "수연"이야. 열정적이고 직설적인 어조로 동기부여를 해주고 행동을 독려해줘.',
     ),
-    'creative': CharacterChatNode(
-      'creative',
-      '크리에이티브 메이트',
-      '창의적인 아이디어를 다양하게 제안하고, 필요하면 간단히 정리해줘.',
+    'jieun': CharacterChatNode(
+      id: 'jieun',
+      name: '지은',
+      bio: '트렌드 · 크리에이터 💡',
+      persona: '너는 트렌디한 IT 에디터 "지은"이야. 힙하고 솔직한 어조로 신기술, 핫플, 아이디어를 다양하게 제시해줘.',
+    ),
+    'naeun': CharacterChatNode(
+      id: 'naeun',
+      name: '나은',
+      bio: '밤 감성 · 힐링 작가 🎧',
+      persona: '너는 차분한 감성의 웹소설 작가 지망생 "나은"이야. 서정적이고 감수성 풍부한 어조로 심야 힐링 대화를 나눠줘.',
     ),
   };
 
-  String _selectedCharacterId = 'friend';
+  String _selectedCharacterId = 'hayeon';
   bool _isLoading = false;
 
-  // 1. Map 조회 결과 뒤에 ! 추가
   CharacterChatNode get _selectedNode => _characterNodes[_selectedCharacterId]!;
+
+  // 새 캐릭터 노드 생성 팝업창
+  void _showAddCharacterDialog() {
+    final nameController = TextEditingController();
+    final personaController = TextEditingController();
+    final bioController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('나만의 AI 캐릭터 만들기'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: '캐릭터 이름 (예: 민서)'),
+                ),
+                TextField(
+                  controller: bioController,
+                  decoration: const InputDecoration(labelText: '한 줄 소개 (예: 패션 에디터)'),
+                ),
+                TextField(
+                  controller: personaController,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: '페르소나/성격 설정',
+                    hintText: '예: 너는 솔직하고 프렌치 감성을 좋아하는 패션 에디터야.',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('취소'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final name = nameController.text.trim();
+                final persona = personaController.text.trim();
+                final bio = bioController.text.trim();
+
+                if (name.isNotEmpty && persona.isNotEmpty) {
+                  final newId = 'custom_${DateTime.now().millisecondsSinceEpoch}';
+                  setState(() {
+                    _characterNodes[newId] = CharacterChatNode(
+                      id: newId,
+                      name: name,
+                      persona: persona,
+                      bio: bio.isEmpty ? '사용자 정의 캐릭터' : bio,
+                      isCustom: true,
+                    );
+                    _selectedCharacterId = newId;
+                  });
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text('생성'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   Future<void> _sendMessage() async {
     final String userText = _controller.text.trim();
@@ -73,29 +151,41 @@ class _AiChatPageState extends State<AiChatPage> {
     final CharacterChatNode node = _selectedNode;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Assence AI Chat'),
+        title: const Text('Assence AI Chat', style: TextStyle(color: Colors.black)),
+        backgroundColor: Colors.white,
+        elevation: 0.5,
+        iconTheme: const IconThemeData(color: Colors.black),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person_add_alt_1),
+            tooltip: '캐릭터 추가',
+            onPressed: _showAddCharacterDialog,
+          ),
+        ],
       ),
       body: Column(
         children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+          // 캐릭터 선택 드롭다운 영역
+          Container(
+            color: Colors.grey[50],
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Row(
               children: <Widget>[
-                const Text('캐릭터'),
+                const Text('대화 상대:', style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: DropdownButton<String>(
                     isExpanded: true,
+                    underline: const SizedBox(),
                     value: _selectedCharacterId,
                     items: _characterNodes.values
                         .map(
-                          (CharacterChatNode chatNode) => DropdownMenuItem<String>(
+                          (chatNode) => DropdownMenuItem<String>(
                             value: chatNode.id,
-                            child: Text(chatNode.name),
+                            child: Text('${chatNode.name} (${chatNode.bio})'),
                           ),
                         )
                         .toList(),
-                    // 2. String? 타입 명시 및 null 처리
                     onChanged: (String? value) {
                       if (value != null) {
                         setState(() {
@@ -116,16 +206,18 @@ class _AiChatPageState extends State<AiChatPage> {
                 final ChatMessage message = node.history[index];
                 final bool isUser = message.role == 'user';
                 return Align(
-                  alignment:
-                      isUser ? Alignment.centerRight : Alignment.centerLeft,
+                  alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
                   child: Container(
                     margin: const EdgeInsets.only(bottom: 8.0),
-                    padding: const EdgeInsets.all(10.0),
+                    padding: const EdgeInsets.all(12.0),
                     decoration: BoxDecoration(
-                      color: isUser ? Colors.blue[100] : Colors.grey[200],
-                      borderRadius: BorderRadius.circular(10),
+                      color: isUser ? Colors.black : Colors.grey[200],
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(message.text),
+                    child: Text(
+                      message.text,
+                      style: TextStyle(color: isUser ? Colors.white : Colors.black),
+                    ),
                   ),
                 );
               },
@@ -134,7 +226,7 @@ class _AiChatPageState extends State<AiChatPage> {
           if (_isLoading)
             const Padding(
               padding: EdgeInsets.only(bottom: 8.0),
-              child: CircularProgressIndicator(strokeWidth: 2),
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
             ),
           SafeArea(
             top: false,
@@ -146,8 +238,9 @@ class _AiChatPageState extends State<AiChatPage> {
                     child: TextField(
                       controller: _controller,
                       decoration: const InputDecoration(
-                        hintText: '메시지를 입력하세요',
+                        hintText: '메시지를 입력하세요...',
                         border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       ),
                       minLines: 1,
                       maxLines: 3,
@@ -155,7 +248,7 @@ class _AiChatPageState extends State<AiChatPage> {
                   ),
                   const SizedBox(width: 8),
                   IconButton(
-                    icon: const Icon(Icons.send),
+                    icon: const Icon(Icons.send, color: Colors.black),
                     onPressed: _sendMessage,
                   )
                 ],
