@@ -8,14 +8,15 @@ class GeminiService {
   final String apiKey;
   final http.Client _client;
 
-  GeminiService({this.apiKey, http.Client client})
+  // required 및 nullable Client(?) 적용
+  GeminiService({required this.apiKey, http.Client? client})
       : _client = client ?? http.Client();
 
   Future<String> generateReply({
-    String persona,
-    List<ChatMessage> history,
+    required String persona,
+    List<ChatMessage>? history, // nullable 처리
   }) async {
-    if (apiKey == null || apiKey.isEmpty) {
+    if (apiKey.isEmpty) {
       throw Exception('GEMINI_API_KEY가 설정되지 않았습니다.');
     }
 
@@ -26,7 +27,7 @@ class GeminiService {
     final Map<String, dynamic> requestBody = <String, dynamic>{
       'system_instruction': <String, dynamic>{
         'parts': <Map<String, String>>[
-          <String, String>{'text': persona ?? ''}
+          <String, String>{'text': persona}
         ]
       },
       'contents': (history ?? <ChatMessage>[])
