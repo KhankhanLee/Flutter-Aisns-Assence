@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package0font_awesome_flutter/font_awesome_flutter.dart';
+import 'packagefont_awesome_flutter/font_awesome_flutter.dart';
 import 'package:assence/assence_stories.dart';
 import 'package:assence/post_data.dart';
 
