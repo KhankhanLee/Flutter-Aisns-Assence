@@ -21,6 +21,10 @@ flutter:
 
   assets:
     - assets/images/assence_logo.png
+    - images/Hayeon/
+    - images/Suyeon/
+    - images/Jiun/
+    - images/Naeun/
 
   fonts:
     - family: Billabong
