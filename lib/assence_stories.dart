@@ -1,19 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:assence/ai_chat_page.dart';
+import 'package:assence/story_pages.dart';
+import 'package:assence/story_schema.dart';
 
 class AssenceStories extends StatelessWidget {
   const AssenceStories({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // AI 페르소나 데이터 리스트
-    final List<Map<String, String>> aiCharacters = [
-      {'name': '내 스토리', 'role': 'user'},
-      {'name': '공감 친구', 'role': 'friend'},
-      {'name': '성장 코치', 'role': 'coach'},
-      {'name': '크리에이티브', 'role': 'creative'},
-    ];
-
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
       child: Column(
@@ -42,19 +35,22 @@ class AssenceStories extends StatelessWidget {
             height: 80.0,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
-              itemCount: aiCharacters.length,
+              itemCount: storyEntries.length,
               itemBuilder: (context, index) {
-                final character = aiCharacters[index];
-                final bool isUser = index == 0;
+                final entry = storyEntries[index];
+                final bool isUser = entry.type == StoryEntryType.myStory;
 
                 return GestureDetector(
                   onTap: () {
-                    if (!isUser) {
-                      // AI 캐릭터 클릭 시 해당 AI와 대화하는 채팅방으로 이동
+                    if (isUser) {
                       Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => AiChatPage()),
+                        MaterialPageRoute(builder: (_) => const MyStoryCameraPage()),
                       );
+                      return;
                     }
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => PersonaStoryFeedPage(entry: entry)),
+                    );
                   },
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8.0),
@@ -67,7 +63,7 @@ class AssenceStories extends StatelessWidget {
                               radius: 28,
                               backgroundColor: isUser ? Colors.grey[300] : Colors.blue[100],
                               child: Icon(
-                                isUser ? Icons.person : Icons.smart_toy,
+                                isUser ? Icons.person : entry.icon,
                                 color: isUser ? Colors.grey[600] : Colors.blue,
                               ),
                             ),
@@ -81,7 +77,7 @@ class AssenceStories extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          character['name']!,
+                          entry.title,
                           style: const TextStyle(fontSize: 12),
                         ),
                       ],
