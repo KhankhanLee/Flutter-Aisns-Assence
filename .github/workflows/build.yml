@@ -2,6 +2,10 @@ name: Build Android APK
 
 on:
   push:
+    branches:
+      - master
+      - 'copilot/**'
+  pull_request:
     branches: [ master ]
   workflow_dispatch:
 
