@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:assence/chat_models.dart';
-import 'package:assence/gemini_service.dart';
+import 'package:assence/services/gemini_service.dart';
 
 class AiChatPage extends StatefulWidget {
   const AiChatPage({super.key});
@@ -10,17 +10,18 @@ class AiChatPage extends StatefulWidget {
 }
 
 class _AiChatPageState extends State<AiChatPage> {
-  final GeminiService _geminiService =
-      GeminiService(apiKey: const String.fromEnvironment('GEMINI_API_KEY'));
+  final GeminiService _geminiService = GeminiService.fromEnvironment();
   final TextEditingController _controller = TextEditingController();
 
   // 기본 여성 SNS 캐릭터 4인방 및 유저 커스텀 노드 저장 맵
-  final Map<String, CharacterChatNode> _characterNodes = <String, CharacterChatNode>{
+  final Map<String, CharacterChatNode> _characterNodes =
+      <String, CharacterChatNode>{
     'hayeon': CharacterChatNode(
       id: 'hayeon',
       name: '하연',
       bio: '일상 · 감성 피드 ✨',
-      persona: '너는 인스타에서 인플루언서로 활동하는 20대 여성 "하연"이야. 말투는 다정하고 이모지를 자주 써. 사용자의 고민이나 일상에 따뜻하게 공감해줘.',
+      persona:
+          '너는 인스타에서 인플루언서로 활동하는 20대 여성 "하연"이야. 말투는 다정하고 이모지를 자주 써. 사용자의 고민이나 일상에 따뜻하게 공감해줘.',
     ),
     'suyeon': CharacterChatNode(
       id: 'suyeon',
@@ -64,11 +65,13 @@ class _AiChatPageState extends State<AiChatPage> {
               children: [
                 TextField(
                   controller: nameController,
-                  decoration: const InputDecoration(labelText: '캐릭터 이름 (예: 민서)'),
+                  decoration:
+                      const InputDecoration(labelText: '캐릭터 이름 (예: 민서)'),
                 ),
                 TextField(
                   controller: bioController,
-                  decoration: const InputDecoration(labelText: '한 줄 소개 (예: 패션 에디터)'),
+                  decoration:
+                      const InputDecoration(labelText: '한 줄 소개 (예: 패션 에디터)'),
                 ),
                 TextField(
                   controller: personaController,
@@ -93,7 +96,8 @@ class _AiChatPageState extends State<AiChatPage> {
                 final bio = bioController.text.trim();
 
                 if (name.isNotEmpty && persona.isNotEmpty) {
-                  final newId = 'custom_${DateTime.now().millisecondsSinceEpoch}';
+                  final newId =
+                      'custom_${DateTime.now().millisecondsSinceEpoch}';
                   setState(() {
                     _characterNodes[newId] = CharacterChatNode(
                       id: newId,
@@ -151,7 +155,8 @@ class _AiChatPageState extends State<AiChatPage> {
     final CharacterChatNode node = _selectedNode;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Assence AI Chat', style: TextStyle(color: Colors.black)),
+        title: const Text('Assence AI Chat',
+            style: TextStyle(color: Colors.black)),
         backgroundColor: Colors.white,
         elevation: 0.5,
         iconTheme: const IconThemeData(color: Colors.black),
@@ -168,10 +173,12 @@ class _AiChatPageState extends State<AiChatPage> {
           // 캐릭터 선택 드롭다운 영역
           Container(
             color: Colors.grey[50],
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Row(
               children: <Widget>[
-                const Text('대화 상대:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('대화 상대:',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: DropdownButton<String>(
@@ -200,13 +207,15 @@ class _AiChatPageState extends State<AiChatPage> {
           ),
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
               itemCount: node.history.length,
               itemBuilder: (BuildContext context, int index) {
                 final ChatMessage message = node.history[index];
                 final bool isUser = message.role == 'user';
                 return Align(
-                  alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+                  alignment:
+                      isUser ? Alignment.centerRight : Alignment.centerLeft,
                   child: Container(
                     margin: const EdgeInsets.only(bottom: 8.0),
                     padding: const EdgeInsets.all(12.0),
@@ -216,7 +225,8 @@ class _AiChatPageState extends State<AiChatPage> {
                     ),
                     child: Text(
                       message.text,
-                      style: TextStyle(color: isUser ? Colors.white : Colors.black),
+                      style: TextStyle(
+                          color: isUser ? Colors.white : Colors.black),
                     ),
                   ),
                 );
@@ -226,7 +236,8 @@ class _AiChatPageState extends State<AiChatPage> {
           if (_isLoading)
             const Padding(
               padding: EdgeInsets.only(bottom: 8.0),
-              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: Colors.black),
             ),
           SafeArea(
             top: false,
@@ -240,7 +251,8 @@ class _AiChatPageState extends State<AiChatPage> {
                       decoration: const InputDecoration(
                         hintText: '메시지를 입력하세요...',
                         border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       ),
                       minLines: 1,
                       maxLines: 3,

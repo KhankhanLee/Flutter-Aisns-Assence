@@ -88,14 +88,16 @@ class _AssenceListState extends State<AssenceList> {
                     height: 300,
                     color: Colors.grey[200],
                     child: const Center(
-                      child: Icon(Icons.broken_image, color: Colors.grey, size: 50),
+                      child: Icon(Icons.broken_image,
+                          color: Colors.grey, size: 50),
                     ),
                   );
                 },
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: <Widget>[

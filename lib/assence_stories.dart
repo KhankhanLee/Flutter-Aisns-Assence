@@ -44,12 +44,14 @@ class AssenceStories extends StatelessWidget {
                   onTap: () {
                     if (isUser) {
                       Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const MyStoryCameraPage()),
+                        MaterialPageRoute(
+                            builder: (_) => const MyStoryCameraPage()),
                       );
                       return;
                     }
                     Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => PersonaStoryFeedPage(entry: entry)),
+                      MaterialPageRoute(
+                          builder: (_) => PersonaStoryFeedPage(entry: entry)),
                     );
                   },
                   child: Padding(
@@ -61,7 +63,8 @@ class AssenceStories extends StatelessWidget {
                           children: <Widget>[
                             CircleAvatar(
                               radius: 28,
-                              backgroundColor: isUser ? Colors.grey[300] : Colors.blue[100],
+                              backgroundColor:
+                                  isUser ? Colors.grey[300] : Colors.blue[100],
                               child: Icon(
                                 isUser ? Icons.person : entry.icon,
                                 color: isUser ? Colors.grey[600] : Colors.blue,
@@ -71,7 +74,8 @@ class AssenceStories extends StatelessWidget {
                               const CircleAvatar(
                                 backgroundColor: Colors.blueAccent,
                                 radius: 9.0,
-                                child: Icon(Icons.add, size: 12.0, color: Colors.white),
+                                child: Icon(Icons.add,
+                                    size: 12.0, color: Colors.white),
                               )
                           ],
                         ),

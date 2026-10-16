@@ -56,7 +56,8 @@ class AiPostSearchPage extends StatelessWidget {
                             children: [
                               Text(
                                 post.username,
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 16),
                               ),
                               const SizedBox(height: 8),
                               Text(post.caption),

@@ -29,7 +29,8 @@ class _MyStoryCameraPageState extends State<MyStoryCameraPage> {
     });
 
     try {
-      final XFile? captured = await _picker.pickImage(source: ImageSource.camera);
+      final XFile? captured =
+          await _picker.pickImage(source: ImageSource.camera);
       if (!mounted) return;
 
       if (captured == null) {
@@ -202,7 +203,10 @@ class PersonaStoryFeedPage extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(14),
                   gradient: LinearGradient(
-                    colors: [Colors.black.withValues(alpha: 0.55), Colors.transparent],
+                    colors: [
+                      Colors.black.withValues(alpha: 0.55),
+                      Colors.transparent
+                    ],
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
                   ),

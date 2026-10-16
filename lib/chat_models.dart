@@ -1,9 +1,6 @@
-class ChatMessage {
-  final String role; // 'user' 또는 'model'
-  final String text;
+import 'package:assence/models/chat_message.dart';
 
-  ChatMessage({required this.role, required this.text});
-}
+export 'package:assence/models/chat_message.dart';
 
 class CharacterChatNode {
   final String id;
