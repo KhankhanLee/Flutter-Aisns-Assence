@@ -6,7 +6,9 @@ import 'package:assence/models/persona.dart';
 import 'package:assence/models/post.dart';
 import 'package:assence/services/gemini_service.dart';
 import 'package:assence/services/local_store.dart';
+import 'package:assence/models/story.dart';
 import 'package:assence/state/feed_store.dart';
+import 'package:assence/state/story_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -176,6 +178,31 @@ void main() {
       final AppStores third = await reopen(gemini);
       expect(third.personas.byId(custom.id), isNull);
       expect(third.chat.historyOf(custom.id), isEmpty);
+    });
+  });
+
+  group('StoryStore', () {
+    test('내 스토리는 저장되고 24시간이 지나면 보이지 않는다', () async {
+      DateTime now = DateTime(2026, 3, 1, 9);
+      final LocalStore local = await openTestStore();
+      final StoryStore first = StoryStore(local, now: () => now);
+      first.addMyStory(imagePath: '', text: '  좋은 아침  ');
+      expect(first.myActiveStories.single.text, '좋은 아침');
+
+      now = now.add(const Duration(hours: 23));
+      final StoryStore reopened = StoryStore(local, now: () => now);
+      expect(reopened.myActiveStories, hasLength(1));
+
+      now = now.add(const Duration(hours: 2));
+      expect(reopened.myActiveStories, isEmpty);
+    });
+
+    test('카테고리 순서대로 페르소나 스토리를 돌려준다', () async {
+      final StoryStore store = StoryStore(await openTestStore());
+      expect(
+          store.storiesOf(<String>['naeun', 'hayeon']).map(
+              (Story s) => s.authorId),
+          <String>['naeun', 'hayeon']);
     });
   });
 }

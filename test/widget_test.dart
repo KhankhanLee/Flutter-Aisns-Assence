@@ -1,4 +1,6 @@
 import 'package:assence/app.dart';
+import 'package:assence/pages/home_page.dart';
+import 'package:assence/pages/story/story_upload_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -153,5 +155,56 @@ void main() {
     final FilledButton share =
         tester.widget<FilledButton>(find.widgetWithText(FilledButton, '공유하기'));
     expect(share.onPressed, isNull);
+  });
+
+  testWidgets('페르소나 스토리를 넘겨 보고, 답장은 DM으로 전송된다', (WidgetTester tester) async {
+    final AppStores stores =
+        await createTestStores(FakeGemini(reply: '답장 고마워요'));
+    await tester.pumpWidget(AssenceApp(stores: stores));
+    await tester.pump();
+
+    await tester.tap(find.text('공감 친구'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('하연 ·'));
+    // 스토리 뷰어는 자동 넘김 애니메이션 때문에 pumpAndSettle을 쓸 수 없다.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('hayeon_daily'), findsOneWidget);
+
+    // 오른쪽을 누르면 다음 스토리(나은)로 넘어간다.
+    await tester.tapAt(const Offset(700, 300));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('naeun_night'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), '저도 비 오는 날 좋아해요');
+    await tester.tap(find.byTooltip('답장 보내기'));
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(
+        stores.chat.historyOf('naeun').first.text, contains('저도 비 오는 날 좋아해요'));
+    expect(stores.chat.historyOf('naeun').last.text, '답장 고마워요');
+
+    await tester.tap(find.byTooltip('닫기'));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('글만으로 내 스토리를 올리면 내 스토리에서 볼 수 있다', (WidgetTester tester) async {
+    final AppStores stores = await createTestStores(FakeGemini());
+    await tester.pumpWidget(AssenceApp(stores: stores));
+    await tester.pump();
+    Navigator.of(tester.element(find.byType(HomePage)))
+        .push(MaterialPageRoute<void>(builder: (_) => const StoryUploadPage()));
+    await tester.pumpAndSettle();
+
+    final Finder upload = find.widgetWithText(FilledButton, '스토리 올리기');
+    expect(tester.widget<FilledButton>(upload).onPressed, isNull);
+
+    await tester.enterText(find.byType(TextField), '오늘도 화이팅');
+    await tester.pump();
+    await tester.tap(upload);
+    await tester.pump();
+
+    expect(stores.stories.myActiveStories.single.text, '오늘도 화이팅');
+    expect(stores.stories.myActiveStories.single.imagePath, isEmpty);
   });
 }
