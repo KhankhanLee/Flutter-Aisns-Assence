@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:assence/navigation.dart';
 import 'package:assence/pages/feed_page.dart';
+import 'package:assence/pages/profile_page.dart';
+import 'package:assence/pages/search_page.dart';
 import 'package:assence/state/notification_store.dart';
 import 'package:assence/widgets/assence_logo.dart';
 
@@ -26,13 +28,13 @@ class _HomePageState extends State<HomePage> {
   Widget _buildTab(int index) {
     switch (index) {
       case searchTab:
-        return const Center(child: Text('AI 생성 포스트 탐색 피드 준비 중'));
+        return const SearchPage();
       case composeTab:
         return const Center(child: Text('게시글 작성 화면'));
       case notificationsTab:
         return const Center(child: Text('활동 알림 화면'));
       case profileTab:
-        return const Center(child: Text('프로필 화면'));
+        return const ProfilePage();
       default:
         return const FeedPage();
     }
