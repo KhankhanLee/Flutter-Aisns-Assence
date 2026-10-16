@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:assence/navigation.dart';
+import 'package:assence/pages/compose_page.dart';
 import 'package:assence/pages/feed_page.dart';
+import 'package:assence/pages/notifications_page.dart';
 import 'package:assence/pages/profile_page.dart';
 import 'package:assence/pages/search_page.dart';
 import 'package:assence/state/notification_store.dart';
@@ -23,16 +25,22 @@ class _HomePageState extends State<HomePage> {
 
   int _currentIndex = feedTab;
 
-  void _select(int index) => setState(() => _currentIndex = index);
+  void _select(int index) {
+    // 알림 탭을 보고 나갈 때 읽음 처리한다. 보는 동안은 새 알림이 강조된 채로 남는다.
+    if (_currentIndex == notificationsTab && index != notificationsTab) {
+      context.read<NotificationStore>().markAllRead();
+    }
+    setState(() => _currentIndex = index);
+  }
 
   Widget _buildTab(int index) {
     switch (index) {
       case searchTab:
         return const SearchPage();
       case composeTab:
-        return const Center(child: Text('게시글 작성 화면'));
+        return ComposePage(onPosted: () => _select(feedTab));
       case notificationsTab:
-        return const Center(child: Text('활동 알림 화면'));
+        return const NotificationsPage();
       case profileTab:
         return const ProfilePage();
       default:

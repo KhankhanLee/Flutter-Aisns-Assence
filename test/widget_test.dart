@@ -122,4 +122,36 @@ void main() {
     expect(find.byKey(const ValueKey<String>('grid_seed_naeun_book')),
         findsOneWidget);
   });
+
+  testWidgets('알림 탭은 답글 알림을 보여주고, 나가면 읽음 처리된다', (WidgetTester tester) async {
+    final AppStores stores = await createTestStores(FakeGemini(reply: '반가워요'));
+    await stores.feed.addComment('seed_hayeon_cafe', '안녕하세요');
+    await tester.pumpWidget(AssenceApp(stores: stores));
+    await tester.pump();
+    expect(find.widgetWithText(Badge, '1'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('알림'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('답글을 남겼어요: 반가워요', findRichText: true),
+        findsOneWidget);
+
+    await tester.tap(find.byTooltip('홈'));
+    await tester.pumpAndSettle();
+    expect(stores.notifications.unreadCount, 0);
+    expect(find.byType(Badge), findsNothing);
+  });
+
+  testWidgets('작성 탭은 사진을 고르기 전에는 공유할 수 없다', (WidgetTester tester) async {
+    final AppStores stores = await createTestStores(FakeGemini());
+    await tester.pumpWidget(AssenceApp(stores: stores));
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('게시물 작성'));
+    await tester.pumpAndSettle();
+    await tester.drag(find.text('새 게시물'), const Offset(0, -600));
+    await tester.pumpAndSettle();
+    final FilledButton share =
+        tester.widget<FilledButton>(find.widgetWithText(FilledButton, '공유하기'));
+    expect(share.onPressed, isNull);
+  });
 }
