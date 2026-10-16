@@ -50,19 +50,24 @@ void main() {
       expect(reply.authorId, post.authorId);
       expect(reply.parentId, post.comments.first.id);
       expect(reply.text, '고마워요!');
-      expect(gemini.personas.single,
-          startsWith(stores.personas.byId(post.authorId)!.prompt));
+      expect(
+        gemini.personas.single,
+        startsWith(stores.personas.byId(post.authorId)!.prompt),
+      );
 
       expect(stores.notifications.unreadCount, 1);
-      expect(stores.notifications.items.single.type,
-          NotificationType.commentReply);
+      expect(
+        stores.notifications.items.single.type,
+        NotificationType.commentReply,
+      );
       stores.notifications.markAllRead();
       expect(stores.notifications.unreadCount, 0);
     });
 
     test('답글 실패는 기록하고, 다시 시도하면 답글이 달린다', () async {
       final FakeGemini gemini = FakeGemini(
-          error: const GeminiException(GeminiErrorKind.network, 'offline'));
+        error: const GeminiException(GeminiErrorKind.network, 'offline'),
+      );
       final AppStores stores = await createTestStores(gemini);
       final Post post = stores.feed.posts.first;
 
@@ -77,25 +82,31 @@ void main() {
     });
 
     test('내 게시물을 올리면 맨 위에 추가되고 페르소나 반응이 달린다', () async {
-      final AppStores stores =
-          await createTestStores(FakeGemini(reply: '멋져요!'));
+      final AppStores stores = await createTestStores(
+        FakeGemini(reply: '멋져요!'),
+      );
 
-      final Future<void> done =
-          stores.feed.addPost(imagePath: '/tmp/me.jpg', caption: '첫 게시물');
+      final Future<void> done = stores.feed.addPost(
+        imagePath: '/tmp/me.jpg',
+        caption: '첫 게시물',
+      );
       final Post mine = stores.feed.posts.first;
       expect(mine.authorId, myUserId);
       await done;
 
       expect(mine.comments, hasLength(2));
       expect(
-          mine.comments.map((Comment c) => c.authorId).toSet(), hasLength(2));
+        mine.comments.map((Comment c) => c.authorId).toSet(),
+        hasLength(2),
+      );
       expect(stores.notifications.unreadCount, 2);
       expect(stores.feed.postsBy(myUserId), <Post>[mine]);
     });
 
     test('키가 없으면 내 게시물은 올라가지만 반응은 생략된다', () async {
-      final AppStores stores =
-          await createTestStores(FakeGemini(configured: false));
+      final AppStores stores = await createTestStores(
+        FakeGemini(configured: false),
+      );
       await stores.feed.addPost(imagePath: '/tmp/me.jpg', caption: '');
       expect(stores.feed.posts.first.comments, isEmpty);
       expect(stores.notifications.unreadCount, 0);
@@ -106,7 +117,9 @@ void main() {
       expect(feed.search(''), hasLength(feed.posts.length));
       expect(feed.search('#러닝').single.id, 'seed_suyeon_running');
       expect(
-          feed.search('나은').map((Post p) => p.authorId), everyElement('naeun'));
+        feed.search('나은').map((Post p) => p.authorId),
+        everyElement('naeun'),
+      );
       expect(feed.search('JIEUN_creative'), hasLength(2));
       expect(feed.search('존재하지않는검색어'), isEmpty);
     });
@@ -123,8 +136,10 @@ void main() {
       final Post restored = second.feed.byId(postId)!;
       expect(restored.likedByMe, isTrue);
       expect(restored.bookmarked, isTrue);
-      expect(
-          restored.comments.map((Comment c) => c.text), <String>['댓글', '답글']);
+      expect(restored.comments.map((Comment c) => c.text), <String>[
+        '댓글',
+        '답글',
+      ]);
       expect(second.feed.bookmarkedPosts.single.id, postId);
       expect(second.notifications.items, hasLength(1));
     });
@@ -137,16 +152,22 @@ void main() {
 
       await stores.chat.send('hayeon', '안녕');
 
-      expect(stores.chat.historyOf('hayeon').map((ChatMessage m) => m.role),
-          <String>['user', 'model']);
+      expect(
+        stores.chat.historyOf('hayeon').map((ChatMessage m) => m.role),
+        <String>['user', 'model'],
+      );
       expect(gemini.personas.single, stores.personas.byId('hayeon')!.prompt);
       expect(stores.chat.historyOf('suyeon'), isEmpty);
     });
 
     test('실패해도 에러 문구는 history에 들어가지 않고, 재시도로 이어진다', () async {
       final FakeGemini gemini = FakeGemini(
-          error: const GeminiException(GeminiErrorKind.http, '{}',
-              statusCode: 500));
+        error: const GeminiException(
+          GeminiErrorKind.http,
+          '{}',
+          statusCode: 500,
+        ),
+      );
       final AppStores stores = await createTestStores(gemini);
 
       await stores.chat.send('hayeon', '안녕');
@@ -156,8 +177,10 @@ void main() {
       gemini.error = null;
       await stores.chat.retry('hayeon');
       expect(stores.chat.errorOf('hayeon'), isNull);
-      expect(stores.chat.historyOf('hayeon').map((ChatMessage m) => m.text),
-          <String>['안녕', 'AI 답변']);
+      expect(
+        stores.chat.historyOf('hayeon').map((ChatMessage m) => m.text),
+        <String>['안녕', 'AI 답변'],
+      );
       // 재시도 요청에는 에러 문구가 섞이지 않은 history가 간다.
       expect(gemini.requests.last.single.text, '안녕');
     });
@@ -165,8 +188,10 @@ void main() {
     test('대화와 커스텀 캐릭터는 앱을 다시 열어도 유지된다', () async {
       final FakeGemini gemini = FakeGemini();
       final AppStores first = await createTestStores(gemini);
-      final Persona custom =
-          first.personas.addCustom(name: '민서', prompt: '패션 에디터야');
+      final Persona custom = first.personas.addCustom(
+        name: '민서',
+        prompt: '패션 에디터야',
+      );
       await first.chat.send(custom.id, '옷 추천해줘');
 
       final AppStores second = await reopen(gemini);
@@ -200,9 +225,11 @@ void main() {
     test('카테고리 순서대로 페르소나 스토리를 돌려준다', () async {
       final StoryStore store = StoryStore(await openTestStore());
       expect(
-          store.storiesOf(<String>['naeun', 'hayeon']).map(
-              (Story s) => s.authorId),
-          <String>['naeun', 'hayeon']);
+        store
+            .storiesOf(<String>['naeun', 'hayeon'])
+            .map((Story s) => s.authorId),
+        <String>['naeun', 'hayeon'],
+      );
     });
   });
 }

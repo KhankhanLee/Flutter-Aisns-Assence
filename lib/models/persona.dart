@@ -22,22 +22,22 @@ class Persona {
   });
 
   factory Persona.fromJson(Map<String, dynamic> json) => Persona(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        handle: json['handle'] as String,
-        bio: json['bio'] as String,
-        prompt: json['prompt'] as String,
-        avatarPath: json['avatarPath'] as String?,
-        isCustom: json['isCustom'] as bool? ?? false,
-      );
+    id: json['id'] as String,
+    name: json['name'] as String,
+    handle: json['handle'] as String,
+    bio: json['bio'] as String,
+    prompt: json['prompt'] as String,
+    avatarPath: json['avatarPath'] as String?,
+    isCustom: json['isCustom'] as bool? ?? false,
+  );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'id': id,
-        'name': name,
-        'handle': handle,
-        'bio': bio,
-        'prompt': prompt,
-        'avatarPath': avatarPath,
-        'isCustom': isCustom,
-      };
+    'id': id,
+    'name': name,
+    'handle': handle,
+    'bio': bio,
+    'prompt': prompt,
+    'avatarPath': avatarPath,
+    'isCustom': isCustom,
+  };
 }

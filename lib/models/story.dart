@@ -20,20 +20,20 @@ class Story {
   bool isActive(DateTime now) => now.difference(createdAt) < lifetime;
 
   factory Story.fromJson(Map<String, dynamic> json) => Story(
-        id: json['id'] as String,
-        authorId: json['authorId'] as String,
-        imagePath: json['imagePath'] as String,
-        text: json['text'] as String,
-        createdAt: DateTime.parse(json['createdAt'] as String),
-      );
+    id: json['id'] as String,
+    authorId: json['authorId'] as String,
+    imagePath: json['imagePath'] as String,
+    text: json['text'] as String,
+    createdAt: DateTime.parse(json['createdAt'] as String),
+  );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'id': id,
-        'authorId': authorId,
-        'imagePath': imagePath,
-        'text': text,
-        'createdAt': createdAt.toIso8601String(),
-      };
+    'id': id,
+    'authorId': authorId,
+    'imagePath': imagePath,
+    'text': text,
+    'createdAt': createdAt.toIso8601String(),
+  };
 }
 
 /// 스토리 바에 표시되는 페르소나 묶음 (예: 공감 친구, 성장 코치).

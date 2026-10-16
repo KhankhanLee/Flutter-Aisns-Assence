@@ -2,7 +2,8 @@ name: assence
 description: A new Flutter ai sns project.
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: '>=3.11.0 <4.0.0'
+  flutter: '>=3.41.0'
 
 dependencies:
   flutter:

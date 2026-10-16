@@ -13,8 +13,12 @@ class NotificationStore extends ChangeNotifier {
   NotificationStore(this._local) {
     final Object? saved = _local.readJson(_storageKey);
     if (saved is List<dynamic>) {
-      _items.addAll(saved.map((dynamic json) =>
-          AppNotification.fromJson(json as Map<String, dynamic>)));
+      _items.addAll(
+        saved.map(
+          (dynamic json) =>
+              AppNotification.fromJson(json as Map<String, dynamic>),
+        ),
+      );
     }
   }
 
@@ -54,5 +58,7 @@ class NotificationStore extends ChangeNotifier {
   }
 
   Future<void> _save() => _local.writeJson(
-      _storageKey, _items.map((AppNotification n) => n.toJson()).toList());
+    _storageKey,
+    _items.map((AppNotification n) => n.toJson()).toList(),
+  );
 }

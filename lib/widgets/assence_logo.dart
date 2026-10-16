@@ -4,11 +4,7 @@ class AssenceLogo extends StatelessWidget {
   final double height;
   final Color color;
 
-  const AssenceLogo({
-    super.key,
-    this.height = 28.0,
-    this.color = Colors.black,
-  });
+  const AssenceLogo({super.key, this.height = 28.0, this.color = Colors.black});
 
   @override
   Widget build(BuildContext context) {

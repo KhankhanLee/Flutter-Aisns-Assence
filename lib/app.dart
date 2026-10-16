@@ -18,7 +18,12 @@ class AppStores {
   final StoryStore stories;
 
   AppStores._(
-      this.personas, this.notifications, this.chat, this.feed, this.stories);
+    this.personas,
+    this.notifications,
+    this.chat,
+    this.feed,
+    this.stories,
+  );
 
   factory AppStores.create(LocalStore local, GeminiService gemini) {
     final PersonaStore personas = PersonaStore(local);
@@ -44,7 +49,8 @@ class AssenceApp extends StatelessWidget {
       providers: <ChangeNotifierProvider<ChangeNotifier>>[
         ChangeNotifierProvider<PersonaStore>.value(value: stores.personas),
         ChangeNotifierProvider<NotificationStore>.value(
-            value: stores.notifications),
+          value: stores.notifications,
+        ),
         ChangeNotifierProvider<ChatStore>.value(value: stores.chat),
         ChangeNotifierProvider<FeedStore>.value(value: stores.feed),
         ChangeNotifierProvider<StoryStore>.value(value: stores.stories),

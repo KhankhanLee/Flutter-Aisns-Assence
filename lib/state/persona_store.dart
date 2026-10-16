@@ -14,8 +14,11 @@ class PersonaStore extends ChangeNotifier {
   PersonaStore(this._local) {
     final Object? saved = _local.readJson(_storageKey);
     if (saved is List<dynamic>) {
-      _custom.addAll(saved.map(
-          (dynamic json) => Persona.fromJson(json as Map<String, dynamic>)));
+      _custom.addAll(
+        saved.map(
+          (dynamic json) => Persona.fromJson(json as Map<String, dynamic>),
+        ),
+      );
     }
   }
 
@@ -54,5 +57,7 @@ class PersonaStore extends ChangeNotifier {
   }
 
   Future<void> _save() => _local.writeJson(
-      _storageKey, _custom.map((Persona p) => p.toJson()).toList());
+    _storageKey,
+    _custom.map((Persona p) => p.toJson()).toList(),
+  );
 }

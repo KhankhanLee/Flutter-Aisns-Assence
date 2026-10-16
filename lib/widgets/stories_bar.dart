@@ -14,23 +14,26 @@ class StoriesBar extends StatelessWidget {
 
   void _openViewer(BuildContext context, List<Story> stories) {
     if (stories.isEmpty) return;
-    Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => StoryViewerPage(stories: stories),
-    ));
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => StoryViewerPage(stories: stories),
+      ),
+    );
   }
 
   void _openCamera(BuildContext context) {
-    Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => const MyStoryCameraPage(),
-    ));
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const MyStoryCameraPage()));
   }
 
   @override
   Widget build(BuildContext context) {
     final StoryStore store = context.watch<StoryStore>();
     final List<Story> mine = store.myActiveStories;
-    final List<Story> all =
-        store.storiesOf(seedPersonas.map((Persona p) => p.id).toList());
+    final List<Story> all = store.storiesOf(
+      seedPersonas.map((Persona p) => p.id).toList(),
+    );
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
@@ -51,8 +54,10 @@ class StoriesBar extends StatelessWidget {
                   children: <Widget>[
                     Icon(Icons.play_arrow, size: 18),
                     SizedBox(width: 2),
-                    Text('모두 보기',
-                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text(
+                      '모두 보기',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ],
                 ),
               ),
@@ -127,10 +132,12 @@ class _StoryCircle extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: hasStory
-                        ? const LinearGradient(colors: <Color>[
-                            Color(0xfff58529),
-                            Color(0xffdd2a7b)
-                          ])
+                        ? const LinearGradient(
+                            colors: <Color>[
+                              Color(0xfff58529),
+                              Color(0xffdd2a7b),
+                            ],
+                          )
                         : null,
                     color: hasStory ? null : Colors.grey[300],
                   ),

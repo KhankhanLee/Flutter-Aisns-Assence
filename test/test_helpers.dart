@@ -13,11 +13,10 @@ class FakeGemini extends GeminiService {
   GeminiException? error;
 
   FakeGemini({this.reply = 'AI 답변', this.error, bool configured = true})
-      : super(
-          apiKey: configured ? 'test-key' : '',
-          client:
-              MockClient((_) => throw StateError('FakeGemini는 네트워크를 쓰지 않는다')),
-        );
+    : super(
+        apiKey: configured ? 'test-key' : '',
+        client: MockClient((_) => throw StateError('FakeGemini는 네트워크를 쓰지 않는다')),
+      );
 
   @override
   Future<String> generateReply({
@@ -35,8 +34,9 @@ class FakeGemini extends GeminiService {
   }
 }
 
-Future<LocalStore> openTestStore(
-    [Map<String, Object> initial = const <String, Object>{}]) async {
+Future<LocalStore> openTestStore([
+  Map<String, Object> initial = const <String, Object>{},
+]) async {
   SharedPreferences.setMockInitialValues(initial);
   return LocalStore.open();
 }

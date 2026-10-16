@@ -31,12 +31,12 @@ class AppNotification {
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'id': id,
-        'type': type.name,
-        'personaId': personaId,
-        'postId': postId,
-        'text': text,
-        'createdAt': createdAt.toIso8601String(),
-        'read': read,
-      };
+    'id': id,
+    'type': type.name,
+    'personaId': personaId,
+    'postId': postId,
+    'text': text,
+    'createdAt': createdAt.toIso8601String(),
+    'read': read,
+  };
 }

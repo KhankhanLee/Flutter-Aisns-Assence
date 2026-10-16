@@ -77,8 +77,9 @@ class ChatStore extends ChangeNotifier {
         persona: persona.prompt,
         history: historyOf(personaId),
       );
-      _histories[personaId]!
-          .add(ChatMessage(role: ChatMessage.modelRole, text: reply));
+      _histories[personaId]!.add(
+        ChatMessage(role: ChatMessage.modelRole, text: reply),
+      );
     } on GeminiException catch (e) {
       _errors[personaId] = e.userMessage;
     } finally {
@@ -89,9 +90,12 @@ class ChatStore extends ChangeNotifier {
   }
 
   Future<void> _save() => _local.writeJson(
-        _storageKey,
-        _histories.map((String id, List<ChatMessage> messages) =>
-            MapEntry<String, dynamic>(
-                id, messages.map((ChatMessage m) => m.toJson()).toList())),
-      );
+    _storageKey,
+    _histories.map(
+      (String id, List<ChatMessage> messages) => MapEntry<String, dynamic>(
+        id,
+        messages.map((ChatMessage m) => m.toJson()).toList(),
+      ),
+    ),
+  );
 }

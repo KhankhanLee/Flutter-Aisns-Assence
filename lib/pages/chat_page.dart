@@ -123,12 +123,16 @@ class _ChatPageState extends State<ChatPage> {
           if (!chat.isConfigured) const ApiKeyBanner(),
           Container(
             color: Colors.grey[50],
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 4.0,
+            ),
             child: Row(
               children: <Widget>[
-                const Text('대화 상대:',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text(
+                  '대화 상대:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: DropdownButton<String>(
@@ -136,19 +140,23 @@ class _ChatPageState extends State<ChatPage> {
                     underline: const SizedBox(),
                     value: persona.id,
                     items: personas.all
-                        .map((Persona p) => DropdownMenuItem<String>(
-                              value: p.id,
-                              child: Row(
-                                children: <Widget>[
-                                  AuthorAvatar(authorId: p.id, radius: 12),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text('${p.name} (${p.bio})',
-                                        overflow: TextOverflow.ellipsis),
+                        .map(
+                          (Persona p) => DropdownMenuItem<String>(
+                            value: p.id,
+                            child: Row(
+                              children: <Widget>[
+                                AuthorAvatar(authorId: p.id, radius: 12),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    '${p.name} (${p.bio})',
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                ],
-                              ),
-                            ))
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
                         .toList(),
                     onChanged: (String? value) {
                       if (value == null) return;
@@ -173,7 +181,9 @@ class _ChatPageState extends State<ChatPage> {
                 : ListView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 12.0, vertical: 8.0),
+                      horizontal: 12.0,
+                      vertical: 8.0,
+                    ),
                     itemCount: itemCount,
                     itemBuilder: (BuildContext context, int index) {
                       if (index == history.length) {
@@ -181,7 +191,9 @@ class _ChatPageState extends State<ChatPage> {
                       }
                       final ChatMessage message = history[index];
                       return _Bubble(
-                          text: message.text, isUser: message.isUser);
+                        text: message.text,
+                        isUser: message.isUser,
+                      );
                     },
                   ),
           ),
@@ -192,8 +204,10 @@ class _ChatPageState extends State<ChatPage> {
               child: Row(
                 children: <Widget>[
                   Expanded(
-                    child: Text(error,
-                        style: TextStyle(color: Colors.red[800], fontSize: 12)),
+                    child: Text(
+                      error,
+                      style: TextStyle(color: Colors.red[800], fontSize: 12),
+                    ),
                   ),
                   TextButton(
                     onPressed: () => chat.retry(persona.id),
@@ -215,7 +229,9 @@ class _ChatPageState extends State<ChatPage> {
                         hintText: '${persona.name}에게 메시지 보내기...',
                         border: const OutlineInputBorder(),
                         contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 10),
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
                       ),
                       minLines: 1,
                       maxLines: 3,
@@ -250,8 +266,9 @@ class _Bubble extends StatelessWidget {
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        constraints:
-            BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.75),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.sizeOf(context).width * 0.75,
+        ),
         margin: const EdgeInsets.only(bottom: 8.0),
         padding: const EdgeInsets.all(12.0),
         decoration: BoxDecoration(
@@ -301,8 +318,9 @@ class _AddCharacterDialogState extends State<_AddCharacterDialog> {
             ),
             TextField(
               controller: _bio,
-              decoration:
-                  const InputDecoration(labelText: '한 줄 소개 (예: 패션 에디터)'),
+              decoration: const InputDecoration(
+                labelText: '한 줄 소개 (예: 패션 에디터)',
+              ),
             ),
             TextField(
               controller: _prompt,
@@ -326,10 +344,10 @@ class _AddCharacterDialogState extends State<_AddCharacterDialog> {
             final String prompt = _prompt.text.trim();
             if (name.isEmpty || prompt.isEmpty) return;
             final Persona created = context.read<PersonaStore>().addCustom(
-                  name: name,
-                  prompt: prompt,
-                  bio: _bio.text.trim(),
-                );
+              name: name,
+              prompt: prompt,
+              bio: _bio.text.trim(),
+            );
             Navigator.pop(context, created);
           },
           child: const Text('생성'),

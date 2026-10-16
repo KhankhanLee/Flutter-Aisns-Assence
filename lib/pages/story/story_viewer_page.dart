@@ -39,12 +39,15 @@ class _StoryViewerPageState extends State<StoryViewerPage>
   void initState() {
     super.initState();
     _index = widget.initialIndex.clamp(0, widget.stories.length - 1);
-    _progress = AnimationController(
-        vsync: this, duration: StoryViewerPage.storyDuration)
-      ..addStatusListener((AnimationStatus status) {
-        if (status == AnimationStatus.completed) _next();
-      })
-      ..forward();
+    _progress =
+        AnimationController(
+            vsync: this,
+            duration: StoryViewerPage.storyDuration,
+          )
+          ..addStatusListener((AnimationStatus status) {
+            if (status == AnimationStatus.completed) _next();
+          })
+          ..forward();
     // 답장을 쓰는 동안은 자동 넘김을 멈춘다.
     _replyFocus.addListener(() {
       if (_replyFocus.hasFocus) {
@@ -82,9 +85,9 @@ class _StoryViewerPageState extends State<StoryViewerPage>
     if (text.isEmpty) return;
     final Story story = _story;
     context.read<ChatStore>().send(
-          story.authorId,
-          '[스토리 답장] "${story.text}"\n$text',
-        );
+      story.authorId,
+      '[스토리 답장] "${story.text}"\n$text',
+    );
     _reply.clear();
     _replyFocus.unfocus();
     ScaffoldMessenger.of(context).showSnackBar(
@@ -122,7 +125,7 @@ class _StoryViewerPageState extends State<StoryViewerPage>
                           gradient: LinearGradient(
                             colors: <Color>[
                               Color(0xff8e2de2),
-                              Color(0xff4a00e0)
+                              Color(0xff4a00e0),
                             ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
@@ -147,7 +150,9 @@ class _StoryViewerPageState extends State<StoryViewerPage>
                             story.text,
                             textAlign: TextAlign.center,
                             style: const TextStyle(
-                                color: Colors.white, fontSize: 18),
+                              color: Colors.white,
+                              fontSize: 18,
+                            ),
                           ),
                         ),
                       ),
@@ -166,13 +171,16 @@ class _StoryViewerPageState extends State<StoryViewerPage>
                           Row(
                             children: <Widget>[
                               AuthorAvatar(
-                                  authorId: story.authorId, radius: 16),
+                                authorId: story.authorId,
+                                radius: 16,
+                              ),
                               const SizedBox(width: 8),
                               Text(
                                 handleOf(personas, story.authorId),
                                 style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold),
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                               const SizedBox(width: 8),
                               Text(
@@ -181,8 +189,10 @@ class _StoryViewerPageState extends State<StoryViewerPage>
                               ),
                               const Spacer(),
                               IconButton(
-                                icon: const Icon(Icons.close,
-                                    color: Colors.white),
+                                icon: const Icon(
+                                  Icons.close,
+                                  color: Colors.white,
+                                ),
                                 tooltip: '닫기',
                                 onPressed: () => Navigator.of(context).pop(),
                               ),

@@ -8,31 +8,68 @@
 
 ## ✨ Key Features
 
-* **AI SNS Feed**: Scroll through AI-generated posts and leave comments. AI characters read your comments and reply back instantly.
-* **Direct Messages (DMs)**: Engage in 1-on-1 conversations with distinct AI personas using an intuitive chat interface.
-* **Node-based Character Memory**: Modeled after LangGraph architecture, each AI character acts as an independent node maintaining its own system prompt (persona) and conversation history state.
-* **Gemini REST Integration**: Lightweight and fast backend communication using Google's `gemini-1.5-flash` via REST API calls.
+* **AI SNS Feed**: Scroll through AI-generated posts, like, bookmark, and comment. The persona who wrote the post reads your comment and replies with Gemini. Failed replies can be retried.
+* **Direct Messages (DMs)**: 1-on-1 chats with each persona. Conversations persist across app restarts, errors are shown separately (never mixed into the chat history), and you can create or delete your own custom characters.
+* **Search**: Filter posts by caption, `#hashtag`, persona name, or handle, and jump to persona profiles.
+* **Create Posts**: Pick a photo from the gallery or camera, add a caption, and share it. A couple of personas react with AI comments.
+* **Activity**: Notifications for AI replies and reactions, with an unread badge on the tab bar.
+* **Profiles**: Your posts and saved posts, plus persona profiles with a "Message" button that opens their DM.
+* **Stories**: Post your own story (photo or text, expires after 24h) and watch persona stories in a full-screen viewer. Story replies go to that persona's DM.
+* **Node-based Character Memory**: Each persona keeps its own system prompt and isolated conversation history, inspired by LangGraph nodes.
 
 ---
 
 ## 🛠 Tech Stack
 
-* **Frontend**: Flutter (Dart)
-* **AI Model**: Google Gemini API (`gemini-1.5-flash`)
-* **State & Memory Management**: Isolated Per-Character Node History (LangGraph Concept)
-* **Network**: HTTP Protocol (HTTPS REST API Requests)
+* **Frontend**: Flutter (Dart 3)
+* **AI Model**: Google Gemini API (`gemini-2.5-flash` by default, configurable)
+* **State Management**: `provider` (`ChangeNotifier` stores)
+* **Persistence**: `shared_preferences` (JSON), picked photos copied to the app documents folder via `path_provider`
+* **Network**: `http` (Gemini REST `generateContent`, API key sent in the `x-goog-api-key` header)
 
 ---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-* Flutter SDK (or a Web-based IDE like FlutLab / Google IDX)
+* Flutter SDK stable 3.41 or newer (CI uses 3.47.7)
 * A valid **Gemini API Key** from [Google AI Studio](https://aistudio.google.com/)
 
 ### Installation & Setup
 
 1. **Clone the repository**
    ```bash
-   git clone [https://github.com/KhankhanLee/Flutter-Aisns-Assence.git](https://github.com/KhankhanLee/Flutter-Aisns-Assence.git)
+   git clone https://github.com/KhankhanLee/Flutter-Aisns-Assence.git
    cd Flutter-Aisns-Assence
+   flutter pub get
+   ```
+
+2. **Run with your API key**
+   ```bash
+   flutter run --dart-define=GEMINI_API_KEY=<your-key>
+   # Optional: use another model
+   flutter run --dart-define=GEMINI_API_KEY=<your-key> --dart-define=GEMINI_MODEL=gemini-2.5-pro
+   ```
+   Without a key the app still runs and shows a banner; AI replies are disabled.
+
+3. **Checks**
+   ```bash
+   flutter analyze
+   flutter test
+   ```
+
+---
+
+## 📁 Project Structure
+
+```
+lib/
+  main.dart, app.dart     # entry point, AppStores + MultiProvider
+  models/                 # Persona, Post, Comment, ChatMessage, Story, AppNotification
+  data/seed_data.dart     # default personas, posts, persona stories
+  services/               # GeminiService, LocalStore (shared_preferences), media storage
+  state/                  # PersonaStore, FeedStore, ChatStore, StoryStore, NotificationStore
+  pages/                  # home, feed, search, compose, notifications, profile, chat, story/
+  widgets/                # PostCard, comments sheet, stories bar, avatars, ...
+test/                     # Gemini service, models, stores, and widget tests
+```

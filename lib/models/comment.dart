@@ -16,20 +16,20 @@ class Comment {
   });
 
   factory Comment.fromJson(Map<String, dynamic> json) => Comment(
-        id: json['id'] as String,
-        postId: json['postId'] as String,
-        authorId: json['authorId'] as String,
-        text: json['text'] as String,
-        createdAt: DateTime.parse(json['createdAt'] as String),
-        parentId: json['parentId'] as String?,
-      );
+    id: json['id'] as String,
+    postId: json['postId'] as String,
+    authorId: json['authorId'] as String,
+    text: json['text'] as String,
+    createdAt: DateTime.parse(json['createdAt'] as String),
+    parentId: json['parentId'] as String?,
+  );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'id': id,
-        'postId': postId,
-        'authorId': authorId,
-        'text': text,
-        'createdAt': createdAt.toIso8601String(),
-        'parentId': parentId,
-      };
+    'id': id,
+    'postId': postId,
+    'authorId': authorId,
+    'text': text,
+    'createdAt': createdAt.toIso8601String(),
+    'parentId': parentId,
+  };
 }

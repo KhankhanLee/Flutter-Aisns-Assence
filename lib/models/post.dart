@@ -24,28 +24,28 @@ class Post {
   }) : comments = comments ?? <Comment>[];
 
   factory Post.fromJson(Map<String, dynamic> json) => Post(
-        id: json['id'] as String,
-        authorId: json['authorId'] as String,
-        imagePath: json['imagePath'] as String,
-        caption: json['caption'] as String,
-        createdAt: DateTime.parse(json['createdAt'] as String),
-        likes: json['likes'] as int? ?? 0,
-        likedByMe: json['likedByMe'] as bool? ?? false,
-        bookmarked: json['bookmarked'] as bool? ?? false,
-        comments: (json['comments'] as List<dynamic>? ?? <dynamic>[])
-            .map((dynamic c) => Comment.fromJson(c as Map<String, dynamic>))
-            .toList(),
-      );
+    id: json['id'] as String,
+    authorId: json['authorId'] as String,
+    imagePath: json['imagePath'] as String,
+    caption: json['caption'] as String,
+    createdAt: DateTime.parse(json['createdAt'] as String),
+    likes: json['likes'] as int? ?? 0,
+    likedByMe: json['likedByMe'] as bool? ?? false,
+    bookmarked: json['bookmarked'] as bool? ?? false,
+    comments: (json['comments'] as List<dynamic>? ?? <dynamic>[])
+        .map((dynamic c) => Comment.fromJson(c as Map<String, dynamic>))
+        .toList(),
+  );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'id': id,
-        'authorId': authorId,
-        'imagePath': imagePath,
-        'caption': caption,
-        'createdAt': createdAt.toIso8601String(),
-        'likes': likes,
-        'likedByMe': likedByMe,
-        'bookmarked': bookmarked,
-        'comments': comments.map((Comment c) => c.toJson()).toList(),
-      };
+    'id': id,
+    'authorId': authorId,
+    'imagePath': imagePath,
+    'caption': caption,
+    'createdAt': createdAt.toIso8601String(),
+    'likes': likes,
+    'likedByMe': likedByMe,
+    'bookmarked': bookmarked,
+    'comments': comments.map((Comment c) => c.toJson()).toList(),
+  };
 }

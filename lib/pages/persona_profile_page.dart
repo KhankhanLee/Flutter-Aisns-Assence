@@ -87,9 +87,13 @@ class ProfileHeader extends StatelessWidget {
                     for (final MapEntry<String, int> stat in stats.entries)
                       Column(
                         children: <Widget>[
-                          Text('${stat.value}',
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 18)),
+                          Text(
+                            '${stat.value}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          ),
                           Text(stat.key),
                         ],
                       ),

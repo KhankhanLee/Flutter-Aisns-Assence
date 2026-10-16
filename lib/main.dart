@@ -6,7 +6,9 @@ import 'package:assence/services/local_store.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final LocalStore local = await LocalStore.open();
-  runApp(AssenceApp(
-    stores: AppStores.create(local, GeminiService.fromEnvironment()),
-  ));
+  runApp(
+    AssenceApp(
+      stores: AppStores.create(local, GeminiService.fromEnvironment()),
+    ),
+  );
 }

@@ -21,8 +21,9 @@ Future<void> showCommentsSheet(BuildContext context, String postId) {
 
 /// 원 댓글 아래에 답글을 들여쓰기해서 보여주는 댓글 목록.
 List<Comment> threadedComments(List<Comment> comments) {
-  final List<Comment> roots =
-      comments.where((Comment c) => c.parentId == null).toList();
+  final List<Comment> roots = comments
+      .where((Comment c) => c.parentId == null)
+      .toList();
   return <Comment>[
     for (final Comment root in roots) ...<Comment>[
       root,
@@ -53,8 +54,10 @@ class CommentsSheet extends StatelessWidget {
         Expanded(
           child: comments.isEmpty
               ? const Center(
-                  child: Text('아직 댓글이 없어요. 첫 댓글을 남겨보세요!',
-                      style: TextStyle(color: Colors.grey)),
+                  child: Text(
+                    '아직 댓글이 없어요. 첫 댓글을 남겨보세요!',
+                    style: TextStyle(color: Colors.grey),
+                  ),
                 )
               : ListView.builder(
                   padding: const EdgeInsets.symmetric(vertical: 8),
@@ -65,8 +68,9 @@ class CommentsSheet extends StatelessWidget {
         ),
         const Divider(height: 1),
         Padding(
-          padding:
-              EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(context).bottom,
+          ),
           child: CommentInput(postId: postId, autofocus: true),
         ),
       ],
@@ -83,8 +87,10 @@ class CommentTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final FeedStore feed = context.watch<FeedStore>();
-    final String handle =
-        handleOf(context.watch<PersonaStore>(), comment.authorId);
+    final String handle = handleOf(
+      context.watch<PersonaStore>(),
+      comment.authorId,
+    );
     final bool isReply = comment.parentId != null;
     final String? error = feed.replyErrorOf(comment.id);
 
@@ -93,8 +99,9 @@ class CommentTile extends StatelessWidget {
         style: const TextStyle(color: Colors.black, fontSize: 13),
         children: <TextSpan>[
           TextSpan(
-              text: '$handle ',
-              style: const TextStyle(fontWeight: FontWeight.bold)),
+            text: '$handle ',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
           TextSpan(text: comment.text),
         ],
       ),
@@ -120,21 +127,29 @@ class CommentTile extends StatelessWidget {
               children: <Widget>[
                 body,
                 const SizedBox(height: 2),
-                Text(formatTimeAgo(comment.createdAt),
-                    style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                Text(
+                  formatTimeAgo(comment.createdAt),
+                  style: const TextStyle(color: Colors.grey, fontSize: 11),
+                ),
                 if (feed.isReplyPending(comment.id))
                   const Padding(
                     padding: EdgeInsets.only(top: 4),
-                    child: Text('답글 작성 중...',
-                        style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    child: Text(
+                      '답글 작성 중...',
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
                   ),
                 if (error != null)
                   Row(
                     children: <Widget>[
                       Expanded(
-                        child: Text(error,
-                            style: TextStyle(
-                                color: Colors.red[700], fontSize: 12)),
+                        child: Text(
+                          error,
+                          style: TextStyle(
+                            color: Colors.red[700],
+                            fontSize: 12,
+                          ),
+                        ),
                       ),
                       TextButton(
                         onPressed: () => feed.retryReply(comment.id),

@@ -39,9 +39,9 @@ class _ComposePageState extends State<ComposePage> {
       setState(() => _imagePath = picked.path);
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('사진을 불러오지 못했어요. 카메라/사진 권한을 확인해 주세요.'),
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('사진을 불러오지 못했어요. 카메라/사진 권한을 확인해 주세요.')),
+      );
     }
   }
 
@@ -61,13 +61,14 @@ class _ComposePageState extends State<ComposePage> {
         _imagePath = null;
         _caption.clear();
       });
-      messenger.showSnackBar(const SnackBar(
-        content: Text('게시물이 올라갔어요. AI 친구들의 반응을 기다려 보세요!'),
-      ));
+      messenger.showSnackBar(
+        const SnackBar(content: Text('게시물이 올라갔어요. AI 친구들의 반응을 기다려 보세요!')),
+      );
       widget.onPosted?.call();
     } on FileSystemException {
       messenger.showSnackBar(
-          const SnackBar(content: Text('사진을 저장하지 못했어요. 다시 시도해 주세요.')));
+        const SnackBar(content: Text('사진을 저장하지 못했어요. 다시 시도해 주세요.')),
+      );
     } finally {
       if (mounted) setState(() => _posting = false);
     }
@@ -79,8 +80,10 @@ class _ComposePageState extends State<ComposePage> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: <Widget>[
-        const Text('새 게시물',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const Text(
+          '새 게시물',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 12),
         AspectRatio(
           aspectRatio: 1,
@@ -90,8 +93,10 @@ class _ComposePageState extends State<ComposePage> {
                 ? Container(
                     color: Colors.grey[200],
                     child: const Center(
-                      child: Text('사진을 선택해 주세요',
-                          style: TextStyle(color: Colors.grey)),
+                      child: Text(
+                        '사진을 선택해 주세요',
+                        style: TextStyle(color: Colors.grey),
+                      ),
                     ),
                   )
                 : Image.file(File(imagePath), fit: BoxFit.cover),
@@ -136,7 +141,9 @@ class _ComposePageState extends State<ComposePage> {
                   height: 18,
                   width: 18,
                   child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white),
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
                 )
               : const Text('공유하기'),
         ),

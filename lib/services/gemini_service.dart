@@ -36,8 +36,10 @@ class GeminiException implements Exception {
 }
 
 class GeminiService {
-  static const String defaultModel =
-      String.fromEnvironment('GEMINI_MODEL', defaultValue: 'gemini-2.5-flash');
+  static const String defaultModel = String.fromEnvironment(
+    'GEMINI_MODEL',
+    defaultValue: 'gemini-2.5-flash',
+  );
   static const String _commentStyle =
       '\n\n지금은 SNS 댓글로 답하는 상황이야. 캐릭터 말투를 유지하면서 1~2문장으로 짧게 답해. 따옴표나 이름표 없이 댓글 내용만 써.';
 
@@ -55,9 +57,9 @@ class GeminiService {
 
   /// `--dart-define=GEMINI_API_KEY=...` 값으로 만든 서비스.
   factory GeminiService.fromEnvironment({http.Client? client}) => GeminiService(
-        apiKey: const String.fromEnvironment('GEMINI_API_KEY'),
-        client: client,
-      );
+    apiKey: const String.fromEnvironment('GEMINI_API_KEY'),
+    client: client,
+  );
 
   bool get isConfigured => apiKey.isNotEmpty;
 
@@ -68,7 +70,9 @@ class GeminiService {
   }) async {
     if (!isConfigured) {
       throw const GeminiException(
-          GeminiErrorKind.missingApiKey, 'GEMINI_API_KEY is empty');
+        GeminiErrorKind.missingApiKey,
+        'GEMINI_API_KEY is empty',
+      );
     }
 
     final Uri uri = Uri.parse(
@@ -78,16 +82,18 @@ class GeminiService {
     final Map<String, dynamic> requestBody = <String, dynamic>{
       'system_instruction': <String, dynamic>{
         'parts': <Map<String, String>>[
-          <String, String>{'text': persona}
-        ]
+          <String, String>{'text': persona},
+        ],
       },
       'contents': history
-          .map((ChatMessage message) => <String, dynamic>{
-                'role': message.role,
-                'parts': <Map<String, String>>[
-                  <String, String>{'text': message.text}
-                ],
-              })
+          .map(
+            (ChatMessage message) => <String, dynamic>{
+              'role': message.role,
+              'parts': <Map<String, String>>[
+                <String, String>{'text': message.text},
+              ],
+            },
+          )
           .toList(),
     };
 
@@ -110,16 +116,22 @@ class GeminiService {
     }
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw GeminiException(GeminiErrorKind.http, response.body,
-          statusCode: response.statusCode);
+      throw GeminiException(
+        GeminiErrorKind.http,
+        response.body,
+        statusCode: response.statusCode,
+      );
     }
 
     // charset 헤더가 없으면 http 패키지는 Latin-1로 디코딩하므로 직접 UTF-8로 읽는다.
-    final String text =
-        _extractText(utf8.decode(response.bodyBytes, allowMalformed: true));
+    final String text = _extractText(
+      utf8.decode(response.bodyBytes, allowMalformed: true),
+    );
     if (text.isEmpty) {
       throw const GeminiException(
-          GeminiErrorKind.emptyResponse, 'no text in candidates');
+        GeminiErrorKind.emptyResponse,
+        'no text in candidates',
+      );
     }
     return text;
   }
@@ -135,7 +147,8 @@ class GeminiService {
       history: <ChatMessage>[
         ChatMessage(
           role: ChatMessage.userRole,
-          text: '네가 올린 게시물 내용:\n${post.caption}\n\n'
+          text:
+              '네가 올린 게시물 내용:\n${post.caption}\n\n'
               '팔로워가 남긴 댓글:\n$commentText\n\n'
               '이 댓글에 답글을 달아줘.',
         ),
@@ -153,7 +166,8 @@ class GeminiService {
       history: <ChatMessage>[
         ChatMessage(
           role: ChatMessage.userRole,
-          text: '친구가 새 사진 게시물을 올렸어. 게시물 문구:\n'
+          text:
+              '친구가 새 사진 게시물을 올렸어. 게시물 문구:\n'
               '${caption.isEmpty ? '(문구 없음)' : caption}\n\n'
               '이 게시물에 댓글을 남겨줘.',
         ),
@@ -174,16 +188,20 @@ class GeminiService {
     if (candidates is! List<dynamic> || candidates.isEmpty) return '';
 
     final Object? first = candidates.first;
-    final Object? content =
-        first is Map<String, dynamic> ? first['content'] : null;
-    final Object? parts =
-        content is Map<String, dynamic> ? content['parts'] : null;
+    final Object? content = first is Map<String, dynamic>
+        ? first['content']
+        : null;
+    final Object? parts = content is Map<String, dynamic>
+        ? content['parts']
+        : null;
     if (parts is! List<dynamic>) return '';
 
     return parts
-        .map((dynamic part) => part is Map<String, dynamic>
-            ? (part['text']?.toString() ?? '')
-            : '')
+        .map(
+          (dynamic part) => part is Map<String, dynamic>
+              ? (part['text']?.toString() ?? '')
+              : '',
+        )
         .where((String text) => text.isNotEmpty)
         .join('\n')
         .trim();

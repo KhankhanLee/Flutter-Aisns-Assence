@@ -41,8 +41,10 @@ class PostCard extends StatelessWidget {
               children: <Widget>[
                 AuthorAvatar(authorId: post.authorId),
                 const SizedBox(width: 10.0),
-                Text(handle,
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(
+                  handle,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
               ],
             ),
           ),
@@ -51,10 +53,7 @@ class PostCard extends StatelessWidget {
           onDoubleTap: () {
             if (!post.likedByMe) feed.toggleLike(post.id);
           },
-          child: AspectRatio(
-            aspectRatio: 1,
-            child: AppImage(post.imagePath),
-          ),
+          child: AspectRatio(aspectRatio: 1, child: AppImage(post.imagePath)),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4.0),
@@ -82,7 +81,8 @@ class PostCard extends StatelessWidget {
               const Spacer(),
               IconButton(
                 icon: Icon(
-                    post.bookmarked ? Icons.bookmark : Icons.bookmark_border),
+                  post.bookmarked ? Icons.bookmark : Icons.bookmark_border,
+                ),
                 tooltip: '저장',
                 onPressed: () => feed.toggleBookmark(post.id),
               ),
@@ -117,8 +117,10 @@ class PostCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
             child: GestureDetector(
               onTap: () => showCommentsSheet(context, post.id),
-              child: Text('댓글 ${thread.length}개 모두 보기',
-                  style: const TextStyle(color: Colors.grey)),
+              child: Text(
+                '댓글 ${thread.length}개 모두 보기',
+                style: const TextStyle(color: Colors.grey),
+              ),
             ),
           ),
         if (preview.isNotEmpty) const SizedBox(height: 4),
@@ -127,8 +129,10 @@ class PostCard extends StatelessWidget {
         if (post.comments.any((Comment c) => feed.isReplyPending(c.id)))
           Padding(
             padding: const EdgeInsets.fromLTRB(32, 2, 16, 0),
-            child: Text('$handle 님이 답글을 작성 중...',
-                style: const TextStyle(color: Colors.grey, fontSize: 12)),
+            child: Text(
+              '$handle 님이 답글을 작성 중...',
+              style: const TextStyle(color: Colors.grey, fontSize: 12),
+            ),
           ),
         for (final Comment comment in post.comments)
           if (feed.replyErrorOf(comment.id) != null)
@@ -137,8 +141,10 @@ class PostCard extends StatelessWidget {
               child: Row(
                 children: <Widget>[
                   Expanded(
-                    child: Text(feed.replyErrorOf(comment.id)!,
-                        style: TextStyle(color: Colors.red[700], fontSize: 12)),
+                    child: Text(
+                      feed.replyErrorOf(comment.id)!,
+                      style: TextStyle(color: Colors.red[700], fontSize: 12),
+                    ),
                   ),
                   TextButton(
                     onPressed: () => feed.retryReply(comment.id),
@@ -148,7 +154,9 @@ class PostCard extends StatelessWidget {
               ),
             ),
         CommentInput(
-            key: ValueKey<String>('input_${post.id}'), postId: post.id),
+          key: ValueKey<String>('input_${post.id}'),
+          postId: post.id,
+        ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: Text(

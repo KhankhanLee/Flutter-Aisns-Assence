@@ -78,10 +78,14 @@ void main() {
   test('시드 게시물과 스토리는 모두 존재하는 페르소나를 가리킨다', () {
     final Set<String> ids = seedPersonas.map((Persona p) => p.id).toSet();
     final DateTime now = DateTime(2026);
-    expect(buildSeedPosts(now).map((Post p) => p.authorId),
-        everyElement(isIn(ids)));
-    expect(buildSeedPersonaStories(now).map((Story s) => s.authorId),
-        everyElement(isIn(ids)));
+    expect(
+      buildSeedPosts(now).map((Post p) => p.authorId),
+      everyElement(isIn(ids)),
+    );
+    expect(
+      buildSeedPersonaStories(now).map((Story s) => s.authorId),
+      everyElement(isIn(ids)),
+    );
     for (final StoryCategory category in storyCategories) {
       expect(category.personaIds, everyElement(isIn(ids)));
     }
@@ -90,7 +94,12 @@ void main() {
   test('스토리는 24시간 뒤 만료된다', () {
     final DateTime created = DateTime(2026, 1, 1, 12);
     final Story story = Story(
-        id: 's', authorId: 'me', imagePath: '', text: '', createdAt: created);
+      id: 's',
+      authorId: 'me',
+      imagePath: '',
+      text: '',
+      createdAt: created,
+    );
     expect(story.isActive(created.add(const Duration(hours: 23))), isTrue);
     expect(story.isActive(created.add(const Duration(hours: 24))), isFalse);
   });
@@ -103,18 +112,26 @@ void main() {
 
     final DateTime now = DateTime(2026, 5, 10, 12);
     expect(formatTimeAgo(now, now: now), '방금 전');
-    expect(formatTimeAgo(now.subtract(const Duration(minutes: 5)), now: now),
-        '5분 전');
-    expect(formatTimeAgo(now.subtract(const Duration(hours: 3)), now: now),
-        '3시간 전');
     expect(
-        formatTimeAgo(now.subtract(const Duration(days: 2)), now: now), '2일 전');
+      formatTimeAgo(now.subtract(const Duration(minutes: 5)), now: now),
+      '5분 전',
+    );
+    expect(
+      formatTimeAgo(now.subtract(const Duration(hours: 3)), now: now),
+      '3시간 전',
+    );
+    expect(
+      formatTimeAgo(now.subtract(const Duration(days: 2)), now: now),
+      '2일 전',
+    );
     expect(formatTimeAgo(DateTime(2026, 4, 1), now: now), '2026.4.1');
   });
 
   test('newId는 연속 호출해도 겹치지 않는다', () {
-    final Set<String> ids =
-        List<String>.generate(100, (_) => newId('x')).toSet();
+    final Set<String> ids = List<String>.generate(
+      100,
+      (_) => newId('x'),
+    ).toSet();
     expect(ids.length, 100);
   });
 }

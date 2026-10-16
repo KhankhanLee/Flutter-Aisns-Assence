@@ -36,8 +36,11 @@ class FeedStore extends ChangeNotifier {
   }) : _random = random ?? Random() {
     final Object? saved = _local.readJson(_storageKey);
     if (saved is List<dynamic>) {
-      _posts.addAll(saved
-          .map((dynamic json) => Post.fromJson(json as Map<String, dynamic>)));
+      _posts.addAll(
+        saved.map(
+          (dynamic json) => Post.fromJson(json as Map<String, dynamic>),
+        ),
+      );
     } else {
       _posts.addAll(buildSeedPosts(DateTime.now()));
     }
@@ -124,8 +127,10 @@ class FeedStore extends ChangeNotifier {
 
   /// 내 게시물을 올리고, 페르소나 몇 명이 반응 댓글을 단다.
   /// 게시물은 첫 await 전에 피드에 추가된다.
-  Future<void> addPost(
-      {required String imagePath, required String caption}) async {
+  Future<void> addPost({
+    required String imagePath,
+    required String caption,
+  }) async {
     final Post post = Post(
       id: newId('post'),
       authorId: myUserId,
@@ -141,14 +146,18 @@ class FeedStore extends ChangeNotifier {
     for (final Persona persona in reactors.take(_reactionCount)) {
       try {
         final String text = await _gemini.generatePostReaction(
-            persona: persona, caption: post.caption);
-        post.comments.add(Comment(
-          id: newId('comment'),
-          postId: post.id,
-          authorId: persona.id,
-          text: text,
-          createdAt: DateTime.now(),
-        ));
+          persona: persona,
+          caption: post.caption,
+        );
+        post.comments.add(
+          Comment(
+            id: newId('comment'),
+            postId: post.id,
+            authorId: persona.id,
+            text: text,
+            createdAt: DateTime.now(),
+          ),
+        );
         post.likes += 1;
         _notifications.add(
           type: NotificationType.postReaction,
@@ -178,14 +187,16 @@ class FeedStore extends ChangeNotifier {
         post: post,
         commentText: comment.text,
       );
-      post.comments.add(Comment(
-        id: newId('comment'),
-        postId: post.id,
-        authorId: author.id,
-        text: text,
-        createdAt: DateTime.now(),
-        parentId: comment.id,
-      ));
+      post.comments.add(
+        Comment(
+          id: newId('comment'),
+          postId: post.id,
+          authorId: author.id,
+          text: text,
+          createdAt: DateTime.now(),
+          parentId: comment.id,
+        ),
+      );
       _notifications.add(
         type: NotificationType.commentReply,
         personaId: author.id,

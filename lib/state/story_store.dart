@@ -14,12 +14,15 @@ class StoryStore extends ChangeNotifier {
   final List<Story> _myStories = <Story>[]; // 오래된 순
 
   StoryStore(this._local, {DateTime Function()? now})
-      : _now = now ?? DateTime.now,
-        _personaStories = buildSeedPersonaStories((now ?? DateTime.now)()) {
+    : _now = now ?? DateTime.now,
+      _personaStories = buildSeedPersonaStories((now ?? DateTime.now)()) {
     final Object? saved = _local.readJson(_storageKey);
     if (saved is List<dynamic>) {
-      _myStories.addAll(saved
-          .map((dynamic json) => Story.fromJson(json as Map<String, dynamic>)));
+      _myStories.addAll(
+        saved.map(
+          (dynamic json) => Story.fromJson(json as Map<String, dynamic>),
+        ),
+      );
     }
   }
 
@@ -29,23 +32,28 @@ class StoryStore extends ChangeNotifier {
 
   /// [personaIds] 순서대로, 아직 만료되지 않은 페르소나 스토리.
   List<Story> storiesOf(List<String> personaIds) => <Story>[
-        for (final String id in personaIds)
-          ..._personaStories
-              .where((Story s) => s.authorId == id && s.isActive(_now())),
-      ];
+    for (final String id in personaIds)
+      ..._personaStories.where(
+        (Story s) => s.authorId == id && s.isActive(_now()),
+      ),
+  ];
 
   void addMyStory({required String imagePath, required String text}) {
-    _myStories.add(Story(
-      id: newId('story'),
-      authorId: myUserId,
-      imagePath: imagePath,
-      text: text.trim(),
-      createdAt: _now(),
-    ));
+    _myStories.add(
+      Story(
+        id: newId('story'),
+        authorId: myUserId,
+        imagePath: imagePath,
+        text: text.trim(),
+        createdAt: _now(),
+      ),
+    );
     // 만료된 스토리는 저장할 때 정리한다.
     _myStories.removeWhere((Story s) => !s.isActive(_now()));
     _local.writeJson(
-        _storageKey, _myStories.map((Story s) => s.toJson()).toList());
+      _storageKey,
+      _myStories.map((Story s) => s.toJson()).toList(),
+    );
     notifyListeners();
   }
 }

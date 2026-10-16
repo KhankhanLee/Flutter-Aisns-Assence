@@ -96,11 +96,7 @@ class _ProfilePageState extends State<ProfilePage> {
             emptyText: '아직 올린 게시물이 없어요. + 탭에서 첫 게시물을 올려보세요!',
           )
         else
-          PostGrid(
-            posts: saved,
-            embedded: true,
-            emptyText: '저장한 게시물이 없어요.',
-          ),
+          PostGrid(posts: saved, embedded: true, emptyText: '저장한 게시물이 없어요.'),
       ],
     );
   }

@@ -24,7 +24,10 @@ class AppImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget fallback(
-        BuildContext context, Object error, StackTrace? stackTrace) {
+      BuildContext context,
+      Object error,
+      StackTrace? stackTrace,
+    ) {
       return Container(
         width: width,
         height: height ?? 300,
@@ -36,11 +39,21 @@ class AppImage extends StatelessWidget {
     }
 
     if (isAssetPath(path)) {
-      return Image.asset(path,
-          fit: fit, width: width, height: height, errorBuilder: fallback);
+      return Image.asset(
+        path,
+        fit: fit,
+        width: width,
+        height: height,
+        errorBuilder: fallback,
+      );
     }
-    return Image.file(File(path),
-        fit: fit, width: width, height: height, errorBuilder: fallback);
+    return Image.file(
+      File(path),
+      fit: fit,
+      width: width,
+      height: height,
+      errorBuilder: fallback,
+    );
   }
 }
 

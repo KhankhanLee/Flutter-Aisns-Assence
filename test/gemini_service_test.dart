@@ -8,15 +8,14 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 String _candidateBody(List<String> parts) => jsonEncode(<String, dynamic>{
-      'candidates': <dynamic>[
-        <String, dynamic>{
-          'content': <String, dynamic>{
-            'parts':
-                parts.map((String t) => <String, String>{'text': t}).toList(),
-          },
-        },
-      ],
-    });
+  'candidates': <dynamic>[
+    <String, dynamic>{
+      'content': <String, dynamic>{
+        'parts': parts.map((String t) => <String, String>{'text': t}).toList(),
+      },
+    },
+  ],
+});
 
 http.Response _okResponse(String body) =>
     http.Response.bytes(utf8.encode(body), 200);
@@ -37,8 +36,10 @@ void main() {
       }),
     );
 
-    final String reply =
-        await service.generateReply(persona: 'p', history: history);
+    final String reply = await service.generateReply(
+      persona: 'p',
+      history: history,
+    );
 
     expect(reply, '안녕하세요');
     expect(captured.headers['x-goog-api-key'], 'secret-key');
@@ -55,11 +56,14 @@ void main() {
   test('여러 part는 줄바꿈으로 합친다', () async {
     final GeminiService service = GeminiService(
       apiKey: 'k',
-      client: MockClient((_) async =>
-          _okResponse(_candidateBody(<String>['첫 줄', '', '둘째 줄']))),
+      client: MockClient(
+        (_) async => _okResponse(_candidateBody(<String>['첫 줄', '', '둘째 줄'])),
+      ),
     );
-    expect(await service.generateReply(persona: 'p', history: history),
-        '첫 줄\n둘째 줄');
+    expect(
+      await service.generateReply(persona: 'p', history: history),
+      '첫 줄\n둘째 줄',
+    );
   });
 
   test('키가 없으면 요청 없이 missingApiKey 예외', () async {
@@ -75,8 +79,13 @@ void main() {
     expect(service.isConfigured, isFalse);
     await expectLater(
       service.generateReply(persona: 'p', history: history),
-      throwsA(isA<GeminiException>().having((GeminiException e) => e.kind,
-          'kind', GeminiErrorKind.missingApiKey)),
+      throwsA(
+        isA<GeminiException>().having(
+          (GeminiException e) => e.kind,
+          'kind',
+          GeminiErrorKind.missingApiKey,
+        ),
+      ),
     );
     expect(called, isFalse);
   });
@@ -89,9 +98,11 @@ void main() {
 
     await expectLater(
       service.generateReply(persona: 'p', history: history),
-      throwsA(isA<GeminiException>()
-          .having((GeminiException e) => e.kind, 'kind', GeminiErrorKind.http)
-          .having((GeminiException e) => e.statusCode, 'statusCode', 429)),
+      throwsA(
+        isA<GeminiException>()
+            .having((GeminiException e) => e.kind, 'kind', GeminiErrorKind.http)
+            .having((GeminiException e) => e.statusCode, 'statusCode', 429),
+      ),
     );
   });
 
@@ -103,8 +114,13 @@ void main() {
       );
       await expectLater(
         service.generateReply(persona: 'p', history: history),
-        throwsA(isA<GeminiException>().having((GeminiException e) => e.kind,
-            'kind', GeminiErrorKind.emptyResponse)),
+        throwsA(
+          isA<GeminiException>().having(
+            (GeminiException e) => e.kind,
+            'kind',
+            GeminiErrorKind.emptyResponse,
+          ),
+        ),
         reason: body,
       );
     }
@@ -117,8 +133,13 @@ void main() {
     );
     await expectLater(
       service.generateReply(persona: 'p', history: history),
-      throwsA(isA<GeminiException>().having(
-          (GeminiException e) => e.kind, 'kind', GeminiErrorKind.network)),
+      throwsA(
+        isA<GeminiException>().having(
+          (GeminiException e) => e.kind,
+          'kind',
+          GeminiErrorKind.network,
+        ),
+      ),
     );
   });
 

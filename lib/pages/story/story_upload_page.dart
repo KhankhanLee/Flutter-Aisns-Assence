@@ -150,11 +150,13 @@ class _StoryUploadPageState extends State<StoryUploadPage> {
           : await persistPickedImage(source, folder: 'stories');
       stories.addMyStory(imagePath: saved, text: _text.text);
       messenger.showSnackBar(
-          const SnackBar(content: Text('스토리를 올렸어요. 24시간 동안 보여요!')));
+        const SnackBar(content: Text('스토리를 올렸어요. 24시간 동안 보여요!')),
+      );
       navigator.pop();
     } on FileSystemException {
       messenger.showSnackBar(
-          const SnackBar(content: Text('사진을 저장하지 못했어요. 다시 시도해 주세요.')));
+        const SnackBar(content: Text('사진을 저장하지 못했어요. 다시 시도해 주세요.')),
+      );
       if (mounted) setState(() => _uploading = false);
     }
   }
@@ -185,7 +187,7 @@ class _StoryUploadPageState extends State<StoryUploadPage> {
                       : Image.file(
                           File(imagePath),
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const Center(
+                          errorBuilder: (_, _, _) => const Center(
                             child: Text(
                               '이미지를 불러올 수 없어요.',
                               style: TextStyle(color: Colors.white),

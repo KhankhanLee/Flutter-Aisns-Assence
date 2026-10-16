@@ -14,8 +14,9 @@ class StoryCategoryPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final List<Story> stories =
-        context.watch<StoryStore>().storiesOf(category.personaIds);
+    final List<Story> stories = context.watch<StoryStore>().storiesOf(
+      category.personaIds,
+    );
     final PersonaStore personas = context.watch<PersonaStore>();
 
     return Scaffold(
@@ -25,7 +26,7 @@ class StoryCategoryPage extends StatelessWidget {
           : ListView.separated(
               padding: const EdgeInsets.all(16.0),
               itemCount: stories.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              separatorBuilder: (_, _) => const SizedBox(height: 12),
               itemBuilder: (BuildContext context, int index) {
                 final Story story = stories[index];
                 return InkWell(
@@ -33,7 +34,9 @@ class StoryCategoryPage extends StatelessWidget {
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => StoryViewerPage(
-                          stories: stories, initialIndex: index),
+                        stories: stories,
+                        initialIndex: index,
+                      ),
                     ),
                   ),
                   child: Ink(

@@ -32,11 +32,13 @@ class _SearchPageState extends State<SearchPage> {
     final List<Persona> personas = q.isEmpty
         ? const <Persona>[]
         : personaStore.all
-            .where((Persona p) =>
-                p.name.toLowerCase().contains(q) ||
-                p.handle.toLowerCase().contains(q) ||
-                p.bio.toLowerCase().contains(q))
-            .toList();
+              .where(
+                (Persona p) =>
+                    p.name.toLowerCase().contains(q) ||
+                    p.handle.toLowerCase().contains(q) ||
+                    p.bio.toLowerCase().contains(q),
+              )
+              .toList();
 
     return Column(
       children: <Widget>[
