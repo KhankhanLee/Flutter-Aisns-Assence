@@ -4,11 +4,7 @@ class AssenceLogo extends StatelessWidget {
   final double height;
   final Color color;
 
-  const AssenceLogo({
-    super.key,
-    this.height = 28.0,
-    this.color = Colors.black,
-  });
+  const AssenceLogo({super.key, this.height = 28.0, this.color = Colors.black});
 
   @override
   Widget build(BuildContext context) {
@@ -53,26 +49,38 @@ class _AssenceSymbolPainter extends CustomPainter {
     // 곡선미를 살린 현대적인 'A' 모티브 엠블럼 그리기
     path.moveTo(size.width * 0.5, 0);
     path.cubicTo(
-      size.width * 0.1, size.height * 0.4,
-      0, size.height * 0.7,
-      0, size.height * 0.85,
+      size.width * 0.1,
+      size.height * 0.4,
+      0,
+      size.height * 0.7,
+      0,
+      size.height * 0.85,
     );
     path.cubicTo(
-      0, size.height,
-      size.width * 0.2, size.height,
-      size.width * 0.4, size.height * 0.8,
+      0,
+      size.height,
+      size.width * 0.2,
+      size.height,
+      size.width * 0.4,
+      size.height * 0.8,
     );
     path.lineTo(size.width * 0.5, size.height * 0.65);
     path.lineTo(size.width * 0.6, size.height * 0.8);
     path.cubicTo(
-      size.width * 0.8, size.height,
-      size.width, size.height,
-      size.width, size.height * 0.85,
+      size.width * 0.8,
+      size.height,
+      size.width,
+      size.height,
+      size.width,
+      size.height * 0.85,
     );
     path.cubicTo(
-      size.width, size.height * 0.7,
-      size.width * 0.9, size.height * 0.4,
-      size.width * 0.5, 0,
+      size.width,
+      size.height * 0.7,
+      size.width * 0.9,
+      size.height * 0.4,
+      size.width * 0.5,
+      0,
     );
     path.close();
 

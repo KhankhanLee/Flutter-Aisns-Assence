@@ -18,7 +18,7 @@ if (flutterRoot == null) {
 
 android {
     namespace "com.example.assence"
-    compileSdkVersion 34
+    compileSdkVersion flutter.compileSdkVersion
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -27,8 +27,8 @@ android {
 
     defaultConfig {
         applicationId "com.example.assence"
-        minSdkVersion 21
-        targetSdkVersion 34
+        minSdkVersion flutter.minSdkVersion
+        targetSdkVersion flutter.targetSdkVersion
         versionCode 1
         versionName "1.0"
     }
