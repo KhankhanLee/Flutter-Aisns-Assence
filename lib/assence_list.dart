@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:assence/assence_stories.dart';
 import 'package:assence/post_data.dart';
 
@@ -31,16 +30,11 @@ class _AssenceListState extends State<AssenceList> {
 
   @override
   Widget build(BuildContext context) {
-    final deviceSize = MediaQuery.of(context).size;
-
     return ListView.builder(
       itemCount: samplePosts.length + 1,
       itemBuilder: (context, index) {
         if (index == 0) {
-          return SizedBox(
-            height: deviceSize.height * 0.15,
-            child: const AssenceStories(),
-          );
+          return const AssenceStories();
         }
 
         final postIndex = index - 1;
@@ -109,7 +103,7 @@ class _AssenceListState extends State<AssenceList> {
                     children: <Widget>[
                       IconButton(
                         icon: Icon(
-                          isLiked ? FontAwesomeIcons.solidHeart : FontAwesomeIcons.heart,
+                          isLiked ? Icons.favorite : Icons.favorite_border,
                           color: isLiked ? Colors.red : Colors.black,
                         ),
                         onPressed: () {
@@ -119,12 +113,12 @@ class _AssenceListState extends State<AssenceList> {
                         },
                       ),
                       const SizedBox(width: 8.0),
-                      const Icon(FontAwesomeIcons.comment),
+                      const Icon(Icons.chat_bubble_outline),
                       const SizedBox(width: 16.0),
-                      const Icon(FontAwesomeIcons.paperPlane),
+                      const Icon(Icons.send_outlined),
                     ],
                   ),
-                  const Icon(FontAwesomeIcons.bookmark)
+                  const Icon(Icons.bookmark_border)
                 ],
               ),
             ),

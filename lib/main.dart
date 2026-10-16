@@ -12,22 +12,22 @@ class MyApp extends StatelessWidget {
       title: 'Assence',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.blue,
-        primaryColor: Colors.black,
-        // buttonColor 대신 colorScheme을 사용합니다.
-        colorScheme: ColorScheme.fromSwatch(primarySwatch: Colors.blue).copyWith(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.black,
           primary: Colors.black,
+          surface: Colors.white,
         ),
-        primaryIconTheme: const IconThemeData(color: Colors.black),
-        // bodyText1 -> bodyLarge로 변경합니다.
+        scaffoldBackgroundColor: Colors.white,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black,
+          elevation: 0.5,
+        ),
         primaryTextTheme: const TextTheme(
-          bodyLarge: TextStyle(color: Colors.black, fontFamily: "Aveny"),
-        ),
-        textTheme: const TextTheme(
-          bodyLarge: TextStyle(color: Colors.black),
+          bodyLarge: TextStyle(color: Colors.black, fontFamily: 'Aveny'),
         ),
       ),
-      home: AssenceHome(),
+      home: const AssenceHome(),
     );
   }
 }

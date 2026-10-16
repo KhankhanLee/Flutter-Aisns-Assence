@@ -13,9 +13,9 @@ class AssenceHome extends StatefulWidget {
 class _AssenceHomeState extends State<AssenceHome> {
   int _currentIndex = 0; // 현재 선택된 탭 인덱스
 
-  // 하단 탭에 대응하는 화면 리스트 (AssenceBody 앞의 const 제거)
+  // 하단 탭에 대응하는 화면 리스트
   late final List<Widget> _pages = <Widget>[
-    AssenceBody(), // 0: 홈 피드 (const 키워드 제거)
+    const AssenceBody(), // 0: 홈 피드
     const Center(child: Text('AI 생성 포스트 탐색 피드 준비 중')), // 1: 돋보기
     const Center(child: Text('게시글 작성 화면')), // 2: + 버튼
     const Center(child: Text('활동 알림 화면')), // 3: 하트
