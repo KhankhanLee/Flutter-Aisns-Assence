@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:assence/models/chat_message.dart';
 import 'package:assence/models/persona.dart';
@@ -63,6 +64,9 @@ class GeminiService {
 
   String apiKey;
   String model;
+
+  /// 사진 생성용 모델. 처음 필요할 때 [resolveImageModel]로 찾는다.
+  String? imageModel;
   final Duration timeout;
   final http.Client _client;
 
@@ -224,6 +228,123 @@ class GeminiService {
     return picked;
   }
 
+  /// 사진 생성(generateContent로 이미지 출력)이 되는 모델 중 최신 Flash 계열을
+  /// 정식 버전 우선으로 고른다.
+  static String? pickImageModel(List<String> ids) {
+    final List<String> candidates = ids
+        .where((String id) => id.startsWith('gemini-') && id.contains('image'))
+        .toList();
+    if (candidates.isEmpty) return null;
+    double version(String id) =>
+        double.tryParse(
+          RegExp(r'^gemini-(\d+(?:\.\d+)?)').firstMatch(id)?.group(1) ?? '',
+        ) ??
+        0;
+    int rank(String id) =>
+        (id.contains('flash') ? 0 : 2) +
+        (id.contains('preview') || id.contains('exp') ? 1 : 0);
+    candidates.sort((String a, String b) {
+      final int byRank = rank(a).compareTo(rank(b));
+      if (byRank != 0) return byRank;
+      final int byVersion = version(b).compareTo(version(a));
+      if (byVersion != 0) return byVersion;
+      return a.length.compareTo(b.length);
+    });
+    return candidates.first;
+  }
+
+  Future<String> resolveImageModel() async {
+    final String? picked = pickImageModel(await listModels());
+    if (picked == null) {
+      throw const GeminiException(
+        GeminiErrorKind.modelUnavailable,
+        'no image generation model for this key',
+      );
+    }
+    return imageModel = picked;
+  }
+
+  /// [prompt]대로 사진을 만든다. [reference]를 주면 그 사진 속 인물을 유지한다.
+  /// 이미지 데이터가 오지 않으면 [GeminiErrorKind.emptyResponse].
+  Future<Uint8List> generateImage({
+    required String prompt,
+    Uint8List? reference,
+    String referenceMimeType = 'image/jpeg',
+  }) async {
+    if (!isConfigured) {
+      throw const GeminiException(GeminiErrorKind.missingApiKey, 'no key');
+    }
+    final String model = imageModel ?? await resolveImageModel();
+    final http.Response response = await _send(
+      _client.post(
+        Uri.parse('$_baseUrl/models/$model:generateContent'),
+        headers: _headers,
+        body: jsonEncode(<String, dynamic>{
+          'contents': <dynamic>[
+            <String, dynamic>{
+              'role': 'user',
+              'parts': <dynamic>[
+                if (reference != null)
+                  <String, dynamic>{
+                    'inline_data': <String, String>{
+                      'mime_type': referenceMimeType,
+                      'data': base64Encode(reference),
+                    },
+                  },
+                <String, String>{'text': prompt},
+              ],
+            },
+          ],
+          'generationConfig': <String, dynamic>{
+            'responseModalities': <String>['TEXT', 'IMAGE'],
+          },
+        }),
+      ),
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw _httpError(response);
+    }
+    final Uint8List? image = _extractImage(
+      utf8.decode(response.bodyBytes, allowMalformed: true),
+    );
+    if (image == null) {
+      throw const GeminiException(
+        GeminiErrorKind.emptyResponse,
+        'no image in candidates',
+      );
+    }
+    return image;
+  }
+
+  static Uint8List? _extractImage(String body) {
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(body);
+    } on FormatException {
+      return null;
+    }
+    final Object? candidates = decoded is Map<String, dynamic>
+        ? decoded['candidates']
+        : null;
+    if (candidates is! List<dynamic> || candidates.isEmpty) return null;
+    final Object? first = candidates.first;
+    final Object? content = first is Map<String, dynamic>
+        ? first['content']
+        : null;
+    final Object? parts = content is Map<String, dynamic>
+        ? content['parts']
+        : null;
+    if (parts is! List<dynamic>) return null;
+    for (final dynamic part in parts) {
+      if (part is! Map<String, dynamic>) continue;
+      final Object? inline = part['inlineData'] ?? part['inline_data'];
+      if (inline is Map<String, dynamic> && inline['data'] is String) {
+        return base64Decode(inline['data'] as String);
+      }
+    }
+    return null;
+  }
+
   /// [persona]를 system instruction으로, [history]를 대화 맥락으로 답변을 만든다.
   Future<String> generateReply({
     required String persona,
@@ -328,6 +449,30 @@ class GeminiService {
               '친구가 새 사진 게시물을 올렸어. 게시물 문구:\n'
               '${caption.isEmpty ? '(문구 없음)' : caption}\n\n'
               '이 게시물에 댓글을 남겨줘.',
+        ),
+      ],
+    );
+  }
+
+  /// [persona]가 오늘 올릴 법한 사진 한 장의 장면 묘사 (사진 생성·캡션에 씀).
+  Future<String> generatePostScene({
+    required Persona persona,
+    required List<String> recentCaptions,
+  }) {
+    final String recent = recentCaptions.isEmpty
+        ? '(없음)'
+        : recentCaptions
+              .map((String c) => '- ${c.split('\n').first}')
+              .join('\n');
+    return generateReply(
+      persona: persona.prompt,
+      history: <ChatMessage>[
+        ChatMessage(
+          role: ChatMessage.userRole,
+          text:
+              '오늘 인스타그램에 올릴 사진 한 장을 정하려고 해. 최근에 올린 게시물:\n$recent\n\n'
+              '이것들과 겹치지 않게, 네 일상에서 자연스러운 장면을 한 문장으로 묘사해줘. '
+              '장소, 하고 있는 일, 분위기가 드러나게. 설명이나 따옴표 없이 장면만 써.',
         ),
       ],
     );

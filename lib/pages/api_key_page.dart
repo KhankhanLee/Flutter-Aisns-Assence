@@ -40,8 +40,8 @@ class _ApiKeyPageState extends State<ApiKeyPage> {
     try {
       final String reply = await ai.saveAndTest(_key.text);
       if (!mounted) return;
-      // 키를 처음 넣었으면 AI 친구가 바로 새 게시물을 하나 올린다.
-      context.read<FeedStore>().maybeAutoPost();
+      // 키를 넣기 전에 게시 예정 시각이 지난 AI 친구가 있으면 지금 올린다.
+      context.read<FeedStore>().runScheduledPosts();
       setState(() {
         _success = true;
         _result = '연결 성공! (모델: ${ai.model})\nAI 응답: $reply';

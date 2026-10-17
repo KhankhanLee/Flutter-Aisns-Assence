@@ -4,6 +4,7 @@ import 'package:assence/pages/home_page.dart';
 import 'package:assence/pages/splash_page.dart';
 import 'package:assence/services/gemini_service.dart';
 import 'package:assence/services/local_store.dart';
+import 'package:assence/services/post_image_source.dart';
 import 'package:assence/state/ai_settings_store.dart';
 import 'package:assence/state/chat_store.dart';
 import 'package:assence/state/feed_store.dart';
@@ -41,7 +42,16 @@ class AppStores {
       personas,
       notifications,
       ChatStore(local, gemini, personas),
-      FeedStore(local, gemini, personas, notifications),
+      FeedStore(
+        local,
+        gemini,
+        personas,
+        notifications,
+        imageSource: GeminiPostImageSource(
+          gemini,
+          enabled: () => ai.imageGeneration,
+        ),
+      ),
       StoryStore(local),
       UserProfileStore(local),
       ai,

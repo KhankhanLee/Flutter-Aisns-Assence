@@ -10,10 +10,12 @@ import 'package:assence/services/local_store.dart';
 class AiSettingsStore extends ChangeNotifier {
   static const String _keyStorageKey = 'gemini_api_key';
   static const String _modelStorageKey = 'gemini_model';
+  static const String _imageStorageKey = 'ai_image_generation';
 
   final LocalStore _local;
   final GeminiService _gemini;
   bool _testing = false;
+  bool _imageGeneration = false;
 
   AiSettingsStore(this._local, this._gemini) {
     final Object? savedKey = _local.readJson(_keyStorageKey);
@@ -26,6 +28,7 @@ class AiSettingsStore extends ChangeNotifier {
     } else if (savedModel is String) {
       _gemini.configure(apiKey: _gemini.apiKey, model: savedModel);
     }
+    _imageGeneration = _local.readJson(_imageStorageKey) == true;
     // 키를 쓰다가 모델을 자동으로 바꾸면 다음 실행에도 그 모델을 쓴다.
     _gemini.onModelChanged = (String model) {
       _local.writeJson(_modelStorageKey, model);
@@ -36,6 +39,16 @@ class AiSettingsStore extends ChangeNotifier {
   bool get isConfigured => _gemini.isConfigured;
   bool get isTesting => _testing;
   String get model => _gemini.model;
+
+  /// AI 친구가 새 게시물 사진을 Gemini로 직접 만들지 여부.
+  /// 이미지 모델은 유료일 수 있어 기본값은 꺼짐 (꺼져 있으면 기존 사진 중에서 고른다).
+  bool get imageGeneration => _imageGeneration;
+
+  set imageGeneration(bool value) {
+    _imageGeneration = value;
+    _local.writeJson(_imageStorageKey, value);
+    notifyListeners();
+  }
 
   /// 화면 표시용으로 가린 키 (예: AIza••••••1234).
   String get maskedKey {

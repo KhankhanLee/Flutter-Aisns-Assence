@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:assence/data/seed_data.dart';
 import 'package:assence/models/chat_message.dart';
@@ -274,6 +275,84 @@ void main() {
             (GeminiException e) => e.kind,
             'kind',
             GeminiErrorKind.invalidApiKey,
+          ),
+        ),
+      );
+    });
+  });
+
+  group('사진 생성', () {
+    test('이미지 모델은 Flash 계열을 정식 버전 우선으로 고른다', () {
+      expect(
+        GeminiService.pickImageModel(<String>[
+          'gemini-3.8-flash',
+          'gemini-3.1-flash-image',
+          'gemini-3.5-flash-image-preview',
+          'gemini-3-pro-image-preview',
+        ]),
+        'gemini-3.1-flash-image',
+      );
+      expect(
+        GeminiService.pickImageModel(<String>['gemini-3.8-flash']),
+        isNull,
+      );
+    });
+
+    test('참고 사진을 함께 보내고 응답의 이미지 데이터를 꺼낸다', () async {
+      late Map<String, dynamic> body;
+      final List<int> png = <int>[0x89, 0x50, 0x4e, 0x47, 1, 2, 3];
+      final GeminiService service = GeminiService(
+        apiKey: 'k',
+        client: MockClient((http.Request request) async {
+          body = jsonDecode(request.body) as Map<String, dynamic>;
+          return _okResponse(
+            jsonEncode(<String, dynamic>{
+              'candidates': <dynamic>[
+                <String, dynamic>{
+                  'content': <String, dynamic>{
+                    'parts': <dynamic>[
+                      <String, String>{'text': '여기 사진이에요'},
+                      <String, dynamic>{
+                        'inlineData': <String, String>{
+                          'mimeType': 'image/png',
+                          'data': base64Encode(png),
+                        },
+                      },
+                    ],
+                  },
+                },
+              ],
+            }),
+          );
+        }),
+      )..imageModel = 'gemini-3.1-flash-image';
+
+      final List<int> image = await service.generateImage(
+        prompt: '카페 사진',
+        reference: Uint8List.fromList(<int>[9, 9]),
+      );
+
+      expect(image, png);
+      final List<dynamic> parts = body['contents'][0]['parts'] as List<dynamic>;
+      expect(parts.first['inline_data']['data'], base64Encode(<int>[9, 9]));
+      expect(parts.last['text'], '카페 사진');
+      expect(body['generationConfig']['responseModalities'], contains('IMAGE'));
+    });
+
+    test('이미지가 없는 응답은 emptyResponse', () async {
+      final GeminiService service = GeminiService(
+        apiKey: 'k',
+        client: MockClient(
+          (_) async => _okResponse(_candidateBody(<String>['글만 있어요'])),
+        ),
+      )..imageModel = 'gemini-3.1-flash-image';
+      await expectLater(
+        service.generateImage(prompt: 'p'),
+        throwsA(
+          isA<GeminiException>().having(
+            (GeminiException e) => e.kind,
+            'kind',
+            GeminiErrorKind.emptyResponse,
           ),
         ),
       );

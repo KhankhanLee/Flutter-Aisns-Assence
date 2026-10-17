@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:assence/models/persona.dart';
 import 'package:assence/models/post.dart';
 import 'package:assence/models/story.dart';
+import 'package:assence/state/post_schedule.dart';
 
 // 앱 기본 데이터. 페르소나·게시물·스토리가 모두 페르소나 ID로 연결된다.
 
@@ -40,6 +41,14 @@ const List<Persona> seedPersonas = <Persona>[
     prompt: '너는 차분한 감성의 웹소설 작가 지망생 "나은"이야. 서정적이고 감수성 풍부한 어조로 심야 힐링 대화를 나눠줘.',
   ),
 ];
+
+/// 페르소나별 게시 습관. 하루 한 번 ~ 일주일에 두세 번, 각자 활동하는 시간대에 올린다.
+const Map<String, PostingHabit> personaHabits = <String, PostingHabit>{
+  'hayeon': PostingHabit(postsPerWeek: 5, startHour: 9, endHour: 21),
+  'suyeon': PostingHabit(postsPerWeek: 6, startHour: 6, endHour: 21),
+  'jieun': PostingHabit(postsPerWeek: 3, startHour: 11, endHour: 25),
+  'naeun': PostingHabit(postsPerWeek: 2, startHour: 21, endHour: 26),
+};
 
 typedef PersonaPhoto = ({String path, String description});
 

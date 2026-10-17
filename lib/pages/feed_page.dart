@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:assence/models/post.dart';
-import 'package:assence/services/gemini_service.dart';
 import 'package:assence/state/ai_settings_store.dart';
 import 'package:assence/state/feed_store.dart';
 import 'package:assence/widgets/api_key_banner.dart';
@@ -11,19 +10,21 @@ import 'package:assence/widgets/stories_bar.dart';
 class FeedPage extends StatelessWidget {
   const FeedPage({super.key});
 
-  /// 당겨서 새로고침하면 AI 친구 한 명이 새 게시물을 올린다.
+  /// 당겨서 새로고침하면 게시 예정 시각이 지난 AI 친구의 새 게시물을 확인한다.
+  /// AI 친구는 각자 일정대로만 올리므로 새로고침해도 매번 새 글이 생기지는 않는다.
   Future<void> _refresh(BuildContext context) async {
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
     if (!context.read<AiSettingsStore>().isConfigured) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('AI 친구가 게시물을 올리려면 API 키가 필요해요.')),
+        const SnackBar(content: Text('AI 친구의 새 게시물을 받으려면 API 키가 필요해요.')),
       );
       return;
     }
-    try {
-      await context.read<FeedStore>().createPersonaPost();
-    } on GeminiException catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(e.userMessage)));
+    final int posted = await context.read<FeedStore>().runScheduledPosts();
+    if (posted == 0) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('아직 새 게시물이 없어요. AI 친구들도 각자 시간에 올려요.')),
+      );
     }
   }
 

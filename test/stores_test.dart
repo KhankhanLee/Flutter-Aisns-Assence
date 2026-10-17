@@ -339,28 +339,6 @@ void main() {
       expect(stores.notifications.items.first.type, NotificationType.newPost);
       expect(stores.feed.isCreatingPost, isFalse);
     });
-
-    test('자동 게시는 키가 있고 마지막 AI 게시물이 오래됐을 때만 한다', () async {
-      final AppStores stores = await createTestStores(FakeGemini());
-      final int before = stores.feed.posts.length;
-
-      // 시드의 최신 AI 게시물은 1시간 전이라 아직 올리지 않는다.
-      await stores.feed.maybeAutoPost();
-      expect(stores.feed.posts.length, before);
-
-      await stores.feed.maybeAutoPost(
-        now: DateTime.now().add(const Duration(hours: 4)),
-      );
-      expect(stores.feed.posts.length, before + 1);
-
-      final AppStores noKey = await createTestStores(
-        FakeGemini(configured: false),
-      );
-      await noKey.feed.maybeAutoPost(
-        now: DateTime.now().add(const Duration(days: 1)),
-      );
-      expect(noKey.feed.posts.length, before);
-    });
   });
 
   group('AiSettingsStore', () {

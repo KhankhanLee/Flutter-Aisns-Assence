@@ -8,36 +8,53 @@ import 'package:assence/models/persona.dart';
 import 'package:assence/models/post.dart';
 import 'package:assence/services/gemini_service.dart';
 import 'package:assence/services/local_store.dart';
+import 'package:assence/services/post_image_source.dart';
 import 'package:assence/state/notification_store.dart';
 import 'package:assence/state/persona_store.dart';
+import 'package:assence/state/post_schedule.dart';
 import 'package:assence/utils/format.dart';
 
 class FeedStore extends ChangeNotifier {
   static const String _storageKey = 'posts';
+  static const String _scheduleKey = 'persona_next_post';
   static const int _reactionCount = 2;
 
-  /// 마지막 페르소나 게시물이 이보다 오래되면 앱을 열 때 새 게시물을 올린다.
-  static const Duration autoPostInterval = Duration(hours: 3);
+  /// 한 번 확인할 때 올리는 최대 게시물 수. 오래 앱을 안 열어도 한꺼번에 몰리지 않게 한다.
+  static const int maxPostsPerCheck = 2;
+
+  /// 사진 생성이 실패하면 이 시간 동안은 시도하지 않고 기존 사진을 쓴다.
+  static const Duration imageRetryDelay = Duration(hours: 12);
 
   final LocalStore _local;
   final GeminiService _gemini;
   final PersonaStore _personas;
   final NotificationStore _notifications;
+  final PostImageSource? _imageSource;
   final Random _random;
+  final DateTime Function() _now;
 
   final List<Post> _posts = <Post>[]; // 최신순
   final Set<String> _pendingReplies = <String>{}; // 답글을 기다리는 댓글 ID
   final Map<String, String> _failedReplies =
       <String, String>{}; // 댓글 ID → 안내 문구
   bool _creatingPost = false;
+  bool _checkingSchedule = false;
+
+  /// 페르소나 ID → 다음 게시 예정 시각.
+  final Map<String, DateTime> _nextPostAt = <String, DateTime>{};
+  DateTime? _imageDisabledUntil;
 
   FeedStore(
     this._local,
     this._gemini,
     this._personas,
     this._notifications, {
+    PostImageSource? imageSource,
     Random? random,
-  }) : _random = random ?? Random() {
+    DateTime Function()? now,
+  }) : _imageSource = imageSource,
+       _random = random ?? Random(),
+       _now = now ?? DateTime.now {
     final Object? saved = _local.readJson(_storageKey);
     if (saved is List<dynamic>) {
       _posts.addAll(
@@ -46,8 +63,26 @@ class FeedStore extends ChangeNotifier {
         ),
       );
     } else {
-      _posts.addAll(buildSeedPosts(DateTime.now()));
+      _posts.addAll(buildSeedPosts(_now()));
     }
+
+    final Object? schedule = _local.readJson(_scheduleKey);
+    if (schedule is Map<String, dynamic>) {
+      schedule.forEach((String id, dynamic time) {
+        _nextPostAt[id] = DateTime.parse(time as String);
+      });
+    }
+    // 일정이 없는 페르소나는 마지막 게시물(없으면 지금)을 기준으로 다음 게시 시각을 정한다.
+    for (final MapEntry<String, PostingHabit> habit in personaHabits.entries) {
+      _nextPostAt.putIfAbsent(
+        habit.key,
+        () => habit.value.nextAfter(
+          postsBy(habit.key).firstOrNull?.createdAt ?? _now(),
+          _random,
+        ),
+      );
+    }
+    _saveSchedule();
   }
 
   /// 페르소나가 새 게시물을 쓰는 중인지 (피드 새로고침 표시용).
@@ -207,12 +242,78 @@ class FeedStore extends ChangeNotifier {
     }
   }
 
-  /// 페르소나가 사진 한 장을 골라 Gemini로 캡션을 쓰고 새 게시물을 올린다.
+  /// 페르소나별 다음 게시 예정 시각 (설정 화면 표시용).
+  Map<String, DateTime> get nextPostTimes =>
+      Map<String, DateTime>.unmodifiable(_nextPostAt);
+
+  /// 게시 예정 시각이 지난 페르소나가 새 게시물을 올린다.
+  /// 앱을 열거나 다시 돌아왔을 때, 피드를 새로고침할 때 부른다.
+  /// 한 번에 [maxPostsPerCheck]개까지만 올리고, 밀린 나머지는 몇 시간 뒤로 미룬다.
+  /// 올린 게시물 수를 돌려준다. 실패는 조용히 넘기고 나중에 다시 시도한다.
+  Future<int> runScheduledPosts() async {
+    if (!_gemini.isConfigured || _checkingSchedule) return 0;
+    _checkingSchedule = true;
+    int posted = 0;
+    try {
+      final DateTime now = _now();
+      final List<MapEntry<String, DateTime>> due =
+          _nextPostAt.entries
+              .where((MapEntry<String, DateTime> e) => !e.value.isAfter(now))
+              .toList()
+            ..sort(
+              (MapEntry<String, DateTime> a, MapEntry<String, DateTime> b) =>
+                  a.value.compareTo(b.value),
+            );
+
+      for (final MapEntry<String, DateTime> entry in due) {
+        final PostingHabit habit = personaHabits[entry.key]!;
+        if (posted >= maxPostsPerCheck) {
+          // 한꺼번에 몰리지 않게 남은 페르소나는 몇 시간 뒤로 미룬다.
+          _nextPostAt[entry.key] = habit.fitActiveHours(
+            now.add(Duration(minutes: 60 + _random.nextInt(5 * 60))),
+            _random,
+          );
+          continue;
+        }
+        // 앱을 안 연 사이에 올린 것처럼 예정 시각으로 기록한다 (너무 오래됐으면 최근으로).
+        final DateTime postedAt = now.difference(entry.value).inHours < 24
+            ? entry.value
+            : now.subtract(Duration(minutes: _random.nextInt(120)));
+        try {
+          final Post? post = await createPersonaPost(
+            personaId: entry.key,
+            at: postedAt,
+          );
+          // 다른 게시물을 만드는 중이라 못 올렸으면 다음 확인 때 다시 시도한다.
+          if (post == null) continue;
+          posted++;
+          final DateTime next = habit.nextAfter(postedAt, _random);
+          _nextPostAt[entry.key] = next.isAfter(now)
+              ? next
+              : habit.nextAfter(now, _random);
+        } on GeminiException {
+          // 할당량 초과나 네트워크 문제일 수 있으니 한 시간 뒤 다시 시도하고 이번엔 멈춘다.
+          _nextPostAt[entry.key] = now.add(const Duration(hours: 1));
+          break;
+        }
+      }
+    } finally {
+      _checkingSchedule = false;
+      _saveSchedule();
+    }
+    return posted;
+  }
+
+  /// [personaId]가 새 게시물을 올린다. 사진 생성이 켜져 있으면 Gemini로 새 사진을
+  /// 만들고, 아니면(또는 실패하면) 그 페르소나의 기존 사진 중에서 고른다.
   /// [personaId]를 안 주면 가장 최근 작성자를 피해서 고른다.
-  /// 실패하면 [GeminiException]을 그대로 던진다.
-  Future<Post?> createPersonaPost({String? personaId}) async {
+  /// 캡션 생성에 실패하면 [GeminiException]을 그대로 던진다.
+  Future<Post?> createPersonaPost({String? personaId, DateTime? at}) async {
     if (_creatingPost) return null;
-    final String? lastAuthor = _latestPersonaPost()?.authorId;
+    final String? lastAuthor = _posts
+        .where((Post p) => p.authorId != myUserId)
+        .firstOrNull
+        ?.authorId;
     final List<String> candidates = personaPhotos.keys
         .where(
           (String id) => personaId == null ? id != lastAuthor : id == personaId,
@@ -224,20 +325,11 @@ class FeedStore extends ChangeNotifier {
     );
     if (persona == null) return null;
 
-    // 같은 사진이 연달아 올라오지 않게, 이 페르소나가 가장 최근에 쓴 사진은 피한다.
-    final List<PersonaPhoto> pool = personaPhotos[persona.id]!;
-    final String? lastPhoto = postsBy(persona.id).firstOrNull?.imagePath;
-    final List<PersonaPhoto> choices = pool
-        .where((PersonaPhoto p) => p.path != lastPhoto)
-        .toList();
-    final PersonaPhoto photo =
-        (choices.isEmpty ? pool : choices)[_random.nextInt(
-          choices.isEmpty ? pool.length : choices.length,
-        )];
-
     _creatingPost = true;
     notifyListeners();
     try {
+      final PersonaPhoto photo =
+          await _generatedPhoto(persona) ?? _pickExistingPhoto(persona);
       final String caption = await _gemini.generatePostCaption(
         persona: persona,
         photoDescription: photo.description,
@@ -247,10 +339,10 @@ class FeedStore extends ChangeNotifier {
         authorId: persona.id,
         imagePath: photo.path,
         caption: caption,
-        createdAt: DateTime.now(),
+        createdAt: at ?? _now(),
         likes: 50 + _random.nextInt(450),
       );
-      _posts.insert(0, post);
+      _insertByTime(post);
       _notifications.add(
         type: NotificationType.newPost,
         personaId: persona.id,
@@ -264,29 +356,54 @@ class FeedStore extends ChangeNotifier {
     }
   }
 
-  /// 키가 있고 마지막 페르소나 게시물이 [autoPostInterval]보다 오래됐으면
-  /// 새 게시물을 하나 올린다. 실패해도 조용히 넘어간다 (앱 시작 시 호출).
-  Future<void> maybeAutoPost({DateTime? now}) async {
-    if (!_gemini.isConfigured) return;
-    final Post? latest = _latestPersonaPost();
-    final DateTime current = now ?? DateTime.now();
-    if (latest != null &&
-        current.difference(latest.createdAt) < autoPostInterval) {
-      return;
-    }
+  /// 사진 생성이 켜져 있으면 오늘의 장면을 정해 사진을 만든다. 안 되면 null.
+  Future<PersonaPhoto?> _generatedPhoto(Persona persona) async {
+    final PostImageSource? source = _imageSource;
+    final DateTime? disabledUntil = _imageDisabledUntil;
+    if (source == null || !source.isEnabled) return null;
+    if (disabledUntil != null && _now().isBefore(disabledUntil)) return null;
     try {
-      await createPersonaPost();
-    } on GeminiException {
-      // 자동 게시는 부가 기능이라 실패해도 알리지 않는다.
+      final String scene = await _gemini.generatePostScene(
+        persona: persona,
+        recentCaptions: postsBy(
+          persona.id,
+        ).take(3).map((Post p) => p.caption).toList(),
+      );
+      final String path = await source.create(persona: persona, scene: scene);
+      return (path: path, description: scene);
+    } catch (_) {
+      // 이미지 모델이 없거나 유료라 막혔거나, 저장에 실패한 경우: 한동안은 기존 사진을 쓴다.
+      _imageDisabledUntil = _now().add(imageRetryDelay);
+      return null;
     }
   }
 
-  Post? _latestPersonaPost() {
-    for (final Post post in _posts) {
-      if (post.authorId != myUserId) return post;
-    }
-    return null;
+  /// 기존 사진 중에서, 이 페르소나가 가장 최근에 쓴 사진은 피해서 고른다.
+  PersonaPhoto _pickExistingPhoto(Persona persona) {
+    final List<PersonaPhoto> pool = personaPhotos[persona.id]!;
+    final String? lastPhoto = postsBy(persona.id).firstOrNull?.imagePath;
+    final List<PersonaPhoto> choices = pool
+        .where((PersonaPhoto p) => p.path != lastPhoto)
+        .toList();
+    final List<PersonaPhoto> from = choices.isEmpty ? pool : choices;
+    return from[_random.nextInt(from.length)];
   }
+
+  /// 피드는 최신순이므로 예정 시각으로 기록된 게시물도 시간 순서에 맞게 넣는다.
+  void _insertByTime(Post post) {
+    final int index = _posts.indexWhere(
+      (Post p) => p.createdAt.isBefore(post.createdAt),
+    );
+    _posts.insert(index == -1 ? _posts.length : index, post);
+  }
+
+  void _saveSchedule() => _local.writeJson(
+    _scheduleKey,
+    _nextPostAt.map(
+      (String id, DateTime time) =>
+          MapEntry<String, String>(id, time.toIso8601String()),
+    ),
+  );
 
   /// 내 게시물을 올리고, 페르소나 몇 명이 반응 댓글을 단다.
   /// 게시물은 첫 await 전에 피드에 추가된다.
