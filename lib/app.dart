@@ -9,6 +9,7 @@ import 'package:assence/state/feed_store.dart';
 import 'package:assence/state/notification_store.dart';
 import 'package:assence/state/persona_store.dart';
 import 'package:assence/state/story_store.dart';
+import 'package:assence/state/user_profile_store.dart';
 
 /// 앱 전역 상태. 저장된 데이터는 생성 시점에 복원된다.
 class AppStores {
@@ -17,6 +18,7 @@ class AppStores {
   final ChatStore chat;
   final FeedStore feed;
   final StoryStore stories;
+  final UserProfileStore profile;
 
   AppStores._(
     this.personas,
@@ -24,6 +26,7 @@ class AppStores {
     this.chat,
     this.feed,
     this.stories,
+    this.profile,
   );
 
   factory AppStores.create(LocalStore local, GeminiService gemini) {
@@ -35,6 +38,7 @@ class AppStores {
       ChatStore(local, gemini, personas),
       FeedStore(local, gemini, personas, notifications),
       StoryStore(local),
+      UserProfileStore(local),
     );
   }
 }
@@ -58,6 +62,7 @@ class AssenceApp extends StatelessWidget {
         ChangeNotifierProvider<ChatStore>.value(value: stores.chat),
         ChangeNotifierProvider<FeedStore>.value(value: stores.feed),
         ChangeNotifierProvider<StoryStore>.value(value: stores.stories),
+        ChangeNotifierProvider<UserProfileStore>.value(value: stores.profile),
       ],
       child: MaterialApp(
         title: 'Assence',

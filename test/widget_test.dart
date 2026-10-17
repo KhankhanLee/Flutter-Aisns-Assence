@@ -247,4 +247,50 @@ void main() {
     expect(find.byType(SplashPage), findsNothing);
     expect(find.byType(HomePage), findsOneWidget);
   });
+
+  testWidgets('설정에서 프로필 닉네임을 바꾸면 프로필과 댓글에 반영된다', (WidgetTester tester) async {
+    final AppStores stores = await createTestStores(FakeGemini());
+    await stores.feed.addComment('seed_hayeon_cafe', '첫 댓글');
+    await tester.pumpWidget(AssenceApp(stores: stores, showSplash: false));
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('프로필'));
+    await tester.pumpAndSettle();
+    expect(find.text('my_assence'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('설정'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('프로필 편집'));
+    await tester.pumpAndSettle();
+
+    final Finder handleField = find.widgetWithText(TextField, '사용자 이름');
+    // 규칙 위반과 페르소나 계정명 중복은 저장하지 않는다.
+    await tester.enterText(handleField, 'Bad Name!');
+    await tester.tap(find.text('완료'));
+    await tester.pump();
+    expect(find.textContaining('영문 소문자'), findsWidgets);
+    await tester.enterText(handleField, 'hayeon_daily');
+    await tester.tap(find.text('완료'));
+    await tester.pump();
+    expect(find.text('이미 사용 중인 사용자 이름이에요.'), findsOneWidget);
+
+    await tester.enterText(handleField, 'dldbswo_05');
+    await tester.enterText(find.widgetWithText(TextField, '이름'), '윤재');
+    await tester.tap(find.text('완료'));
+    await tester.pumpAndSettle();
+
+    expect(stores.profile.handle, 'dldbswo_05');
+    expect(stores.profile.name, '윤재');
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('dldbswo_05'), findsOneWidget);
+    expect(find.text('윤재'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('홈'));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('dldbswo_05 첫 댓글', findRichText: true),
+      findsOneWidget,
+    );
+  });
 }

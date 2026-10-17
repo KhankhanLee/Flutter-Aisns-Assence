@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:assence/models/comment.dart';
 import 'package:assence/models/post.dart';
 import 'package:assence/state/feed_store.dart';
-import 'package:assence/state/persona_store.dart';
 import 'package:assence/utils/format.dart';
 import 'package:assence/widgets/author_avatar.dart';
 
@@ -87,10 +86,7 @@ class CommentTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final FeedStore feed = context.watch<FeedStore>();
-    final String handle = handleOf(
-      context.watch<PersonaStore>(),
-      comment.authorId,
-    );
+    final String handle = authorHandle(context, comment.authorId);
     final bool isReply = comment.parentId != null;
     final String? error = feed.replyErrorOf(comment.id);
 

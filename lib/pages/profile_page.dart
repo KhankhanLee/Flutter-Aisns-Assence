@@ -4,8 +4,10 @@ import 'package:assence/models/persona.dart';
 import 'package:assence/models/post.dart';
 import 'package:assence/navigation.dart';
 import 'package:assence/pages/persona_profile_page.dart';
+import 'package:assence/pages/profile_edit_page.dart';
 import 'package:assence/state/feed_store.dart';
 import 'package:assence/state/persona_store.dart';
+import 'package:assence/state/user_profile_store.dart';
 import 'package:assence/widgets/author_avatar.dart';
 import 'package:assence/widgets/post_grid.dart';
 
@@ -28,18 +30,28 @@ class _ProfilePageState extends State<ProfilePage> {
     final List<Persona> personas = context.watch<PersonaStore>().all;
     final List<Post> myPosts = feed.postsBy(myUserId);
     final List<Post> saved = feed.bookmarkedPosts;
+    final UserProfileStore profile = context.watch<UserProfileStore>();
 
     return ListView(
       children: <Widget>[
         ProfileHeader(
           authorId: myUserId,
-          name: myHandle,
-          bio: 'Assence에서 AI 친구들과 소통 중',
+          name: profile.name,
+          bio: profile.bio,
           stats: <String, int>{
             '게시물': myPosts.length,
             '저장됨': saved.length,
             'AI 친구': personas.length,
           },
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: OutlinedButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const ProfileEditPage()),
+            ),
+            child: const Text('프로필 편집'),
+          ),
         ),
         const Padding(
           padding: EdgeInsets.fromLTRB(16, 0, 16, 8),

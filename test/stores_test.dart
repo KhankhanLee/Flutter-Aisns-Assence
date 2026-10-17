@@ -9,6 +9,7 @@ import 'package:assence/services/local_store.dart';
 import 'package:assence/models/story.dart';
 import 'package:assence/state/feed_store.dart';
 import 'package:assence/state/story_store.dart';
+import 'package:assence/state/user_profile_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -230,6 +231,33 @@ void main() {
             .map((Story s) => s.authorId),
         <String>['naeun', 'hayeon'],
       );
+    });
+  });
+
+  group('UserProfileStore', () {
+    test('계정명 규칙을 검사한다', () {
+      String? check(String h) =>
+          UserProfileStore.validateHandle(h, <String>['hayeon_daily']);
+      expect(check('dldbswo_05'), isNull);
+      expect(check('a.b_c'), isNull);
+      expect(check(''), isNotNull);
+      expect(check('Upper'), isNotNull);
+      expect(check('공백 있음'), isNotNull);
+      expect(check('.dot'), isNotNull);
+      expect(check('dot.'), isNotNull);
+      expect(check('a' * 31), isNotNull);
+      expect(check('hayeon_daily'), isNotNull);
+    });
+
+    test('수정한 프로필은 다시 열어도 유지되고, 빈 이름은 기본값이 된다', () async {
+      final LocalStore local = await openTestStore();
+      UserProfileStore(
+        local,
+      ).update(handle: ' new_me ', name: '  ', bio: ' 안녕 ');
+      final UserProfileStore reopened = UserProfileStore(local);
+      expect(reopened.handle, 'new_me');
+      expect(reopened.name, UserProfileStore.defaultName);
+      expect(reopened.bio, '안녕');
     });
   });
 }

@@ -176,7 +176,7 @@ class _StoryViewerPageState extends State<StoryViewerPage>
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                handleOf(personas, story.authorId),
+                                authorHandle(context, story.authorId),
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
