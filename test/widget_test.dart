@@ -1,5 +1,6 @@
 import 'package:assence/app.dart';
 import 'package:assence/pages/home_page.dart';
+import 'package:assence/pages/splash_page.dart';
 import 'package:assence/pages/story/story_upload_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,7 +10,7 @@ import 'test_helpers.dart';
 void main() {
   testWidgets('앱이 홈 피드와 하단 탭을 렌더링한다', (WidgetTester tester) async {
     final AppStores stores = await createTestStores(FakeGemini());
-    await tester.pumpWidget(AssenceApp(stores: stores));
+    await tester.pumpWidget(AssenceApp(stores: stores, showSplash: false));
     await tester.pump();
 
     expect(find.text('Assence'), findsOneWidget);
@@ -22,7 +23,7 @@ void main() {
     final AppStores stores = await createTestStores(
       FakeGemini(configured: false),
     );
-    await tester.pumpWidget(AssenceApp(stores: stores));
+    await tester.pumpWidget(AssenceApp(stores: stores, showSplash: false));
     await tester.pump();
 
     expect(find.textContaining('Gemini API 키가 설정되지 않아'), findsOneWidget);
@@ -30,7 +31,7 @@ void main() {
 
   testWidgets('좋아요를 누르면 카운트가 1 늘어난다', (WidgetTester tester) async {
     final AppStores stores = await createTestStores(FakeGemini());
-    await tester.pumpWidget(AssenceApp(stores: stores));
+    await tester.pumpWidget(AssenceApp(stores: stores, showSplash: false));
     await tester.pump();
 
     await tester.drag(find.byType(Scrollable).first, const Offset(0, -700));
@@ -46,7 +47,7 @@ void main() {
   ) async {
     final FakeGemini gemini = FakeGemini(reply: '고마워요 ☕️');
     final AppStores stores = await createTestStores(gemini);
-    await tester.pumpWidget(AssenceApp(stores: stores));
+    await tester.pumpWidget(AssenceApp(stores: stores, showSplash: false));
     await tester.pump();
 
     await tester.enterText(
@@ -68,7 +69,7 @@ void main() {
     final AppStores stores = await createTestStores(
       FakeGemini(reply: '안녕하세요!'),
     );
-    await tester.pumpWidget(AssenceApp(stores: stores));
+    await tester.pumpWidget(AssenceApp(stores: stores, showSplash: false));
     await tester.pump();
 
     await tester.tap(find.byTooltip('AI 채팅'));
@@ -89,7 +90,7 @@ void main() {
 
   testWidgets('검색 탭에서 해시태그로 게시물을 거르고 페르소나를 찾는다', (WidgetTester tester) async {
     final AppStores stores = await createTestStores(FakeGemini());
-    await tester.pumpWidget(AssenceApp(stores: stores));
+    await tester.pumpWidget(AssenceApp(stores: stores, showSplash: false));
     await tester.pump();
 
     await tester.tap(find.byTooltip('검색'));
@@ -127,7 +128,7 @@ void main() {
   testWidgets('저장한 게시물이 프로필 저장됨 탭에 보인다', (WidgetTester tester) async {
     final AppStores stores = await createTestStores(FakeGemini());
     stores.feed.toggleBookmark('seed_naeun_book');
-    await tester.pumpWidget(AssenceApp(stores: stores));
+    await tester.pumpWidget(AssenceApp(stores: stores, showSplash: false));
     await tester.pump();
 
     await tester.tap(find.byTooltip('프로필'));
@@ -145,7 +146,7 @@ void main() {
   testWidgets('알림 탭은 답글 알림을 보여주고, 나가면 읽음 처리된다', (WidgetTester tester) async {
     final AppStores stores = await createTestStores(FakeGemini(reply: '반가워요'));
     await stores.feed.addComment('seed_hayeon_cafe', '안녕하세요');
-    await tester.pumpWidget(AssenceApp(stores: stores));
+    await tester.pumpWidget(AssenceApp(stores: stores, showSplash: false));
     await tester.pump();
     expect(find.widgetWithText(Badge, '1'), findsOneWidget);
 
@@ -164,7 +165,7 @@ void main() {
 
   testWidgets('작성 탭은 사진을 고르기 전에는 공유할 수 없다', (WidgetTester tester) async {
     final AppStores stores = await createTestStores(FakeGemini());
-    await tester.pumpWidget(AssenceApp(stores: stores));
+    await tester.pumpWidget(AssenceApp(stores: stores, showSplash: false));
     await tester.pump();
 
     await tester.tap(find.byTooltip('게시물 작성'));
@@ -181,7 +182,7 @@ void main() {
     final AppStores stores = await createTestStores(
       FakeGemini(reply: '답장 고마워요'),
     );
-    await tester.pumpWidget(AssenceApp(stores: stores));
+    await tester.pumpWidget(AssenceApp(stores: stores, showSplash: false));
     await tester.pump();
 
     await tester.tap(find.text('공감 친구'));
@@ -213,7 +214,7 @@ void main() {
 
   testWidgets('글만으로 내 스토리를 올리면 내 스토리에서 볼 수 있다', (WidgetTester tester) async {
     final AppStores stores = await createTestStores(FakeGemini());
-    await tester.pumpWidget(AssenceApp(stores: stores));
+    await tester.pumpWidget(AssenceApp(stores: stores, showSplash: false));
     await tester.pump();
     Navigator.of(
       tester.element(find.byType(HomePage)),
@@ -230,5 +231,20 @@ void main() {
 
     expect(stores.stories.myActiveStories.single.text, '오늘도 화이팅');
     expect(stores.stories.myActiveStories.single.imagePath, isEmpty);
+  });
+
+  testWidgets('시작 화면에서 로고를 보여준 뒤 홈 피드로 넘어간다', (WidgetTester tester) async {
+    final AppStores stores = await createTestStores(FakeGemini());
+    await tester.pumpWidget(AssenceApp(stores: stores));
+    await tester.pump();
+
+    expect(find.byType(SplashPage), findsOneWidget);
+    expect(find.text('AI 친구들과 함께하는 SNS'), findsOneWidget);
+    expect(find.byType(HomePage), findsNothing);
+
+    await tester.pump(SplashPage.duration);
+    await tester.pumpAndSettle();
+    expect(find.byType(SplashPage), findsNothing);
+    expect(find.byType(HomePage), findsOneWidget);
   });
 }

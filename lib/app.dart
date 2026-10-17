@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:assence/pages/home_page.dart';
+import 'package:assence/pages/splash_page.dart';
 import 'package:assence/services/gemini_service.dart';
 import 'package:assence/services/local_store.dart';
 import 'package:assence/state/chat_store.dart';
@@ -41,7 +42,10 @@ class AppStores {
 class AssenceApp extends StatelessWidget {
   final AppStores stores;
 
-  const AssenceApp({super.key, required this.stores});
+  /// 처음에 로고 시작 화면을 보여줄지 여부. 테스트에서는 바로 홈으로 간다.
+  final bool showSplash;
+
+  const AssenceApp({super.key, required this.stores, this.showSplash = true});
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +78,7 @@ class AssenceApp extends StatelessWidget {
             bodyLarge: TextStyle(color: Colors.black, fontFamily: 'Aveny'),
           ),
         ),
-        home: const HomePage(),
+        home: showSplash ? const SplashPage() : const HomePage(),
       ),
     );
   }
