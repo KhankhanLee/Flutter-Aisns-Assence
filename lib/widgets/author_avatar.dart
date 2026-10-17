@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:assence/models/persona.dart';
 import 'package:assence/state/persona_store.dart';
+import 'package:assence/state/user_profile_store.dart';
 import 'package:assence/widgets/app_image.dart';
 
 /// 작성자(나 또는 페르소나)의 원형 프로필 이미지.
@@ -40,10 +41,9 @@ class AuthorAvatar extends StatelessWidget {
   }
 }
 
-/// 작성자 계정명. 나는 [myHandle]로 표시한다.
-const String myHandle = 'my_assence';
-
-String handleOf(PersonaStore personas, String authorId) {
-  if (authorId == myUserId) return myHandle;
-  return personas.byId(authorId)?.handle ?? '알 수 없음';
+/// 작성자 계정명. 나는 프로필에서 설정한 계정명으로 표시한다.
+/// build 안에서 부르면 계정명이 바뀔 때 다시 그려진다.
+String authorHandle(BuildContext context, String authorId) {
+  if (authorId == myUserId) return context.watch<UserProfileStore>().handle;
+  return context.watch<PersonaStore>().byId(authorId)?.handle ?? '알 수 없음';
 }

@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:assence/models/app_notification.dart';
 import 'package:assence/navigation.dart';
 import 'package:assence/state/notification_store.dart';
-import 'package:assence/state/persona_store.dart';
 import 'package:assence/utils/format.dart';
 import 'package:assence/widgets/author_avatar.dart';
 
@@ -15,7 +14,6 @@ class NotificationsPage extends StatelessWidget {
     final List<AppNotification> items = context
         .watch<NotificationStore>()
         .items;
-    final PersonaStore personas = context.watch<PersonaStore>();
 
     if (items.isEmpty) {
       return const Center(
@@ -32,7 +30,7 @@ class NotificationsPage extends StatelessWidget {
       separatorBuilder: (_, _) => const Divider(height: 1),
       itemBuilder: (BuildContext context, int index) {
         final AppNotification n = items[index];
-        final String handle = handleOf(personas, n.personaId);
+        final String handle = authorHandle(context, n.personaId);
         final String action = switch (n.type) {
           NotificationType.commentReply => '님이 회원님의 댓글에 답글을 남겼어요',
           NotificationType.postReaction => '님이 회원님의 게시물에 댓글을 남겼어요',

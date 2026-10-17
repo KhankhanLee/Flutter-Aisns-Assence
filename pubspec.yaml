@@ -17,7 +17,9 @@ dependencies:
   path_provider: ^2.1.6
 
 dev_dependencies:
+  flutter_launcher_icons: ^0.14.4
   flutter_lints: ^6.0.0
+  flutter_native_splash: ^2.4.8
   flutter_test:
     sdk: flutter
 
@@ -25,7 +27,6 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/images/assence_logo.png
     - images/Hayeon/
     - images/Suyeon/
     - images/Jiun/
@@ -41,3 +42,21 @@ flutter:
           style: normal
         - asset: assets/fonts/AvenyTMedium.otf
           style: italic
+
+# 아이콘·시작 화면 원본은 tool/render_brand_assets.dart로 생성한다.
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/branding/icon.png
+  remove_alpha_ios: true
+  adaptive_icon_background: assets/branding/icon_background.png
+  adaptive_icon_foreground: assets/branding/icon_foreground.png
+  min_sdk_android: 21
+
+flutter_native_splash:
+  color: "#FFFFFF"
+  image: assets/branding/splash.png
+  android_12:
+    color: "#FFFFFF"
+    image: assets/branding/splash_android12.png
+  web: false

@@ -5,7 +5,6 @@ import 'package:assence/models/persona.dart';
 import 'package:assence/models/post.dart';
 import 'package:assence/navigation.dart';
 import 'package:assence/state/feed_store.dart';
-import 'package:assence/state/persona_store.dart';
 import 'package:assence/utils/format.dart';
 import 'package:assence/widgets/app_image.dart';
 import 'package:assence/widgets/author_avatar.dart';
@@ -21,8 +20,7 @@ class PostCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final FeedStore feed = context.read<FeedStore>();
-    final PersonaStore personas = context.watch<PersonaStore>();
-    final String handle = handleOf(personas, post.authorId);
+    final String handle = authorHandle(context, post.authorId);
     final bool fromPersona = post.authorId != myUserId;
     final List<Comment> thread = threadedComments(post.comments);
     final List<Comment> preview = thread.length > _previewCommentCount

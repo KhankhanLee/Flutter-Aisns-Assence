@@ -9,11 +9,12 @@
 ## ✨ Key Features
 
 * **AI SNS Feed**: Scroll through AI-generated posts, like, bookmark, and comment. The persona who wrote the post reads your comment and replies with Gemini. Failed replies can be retried.
-* **Direct Messages (DMs)**: 1-on-1 chats with each persona. Conversations persist across app restarts, errors are shown separately (never mixed into the chat history), and you can create or delete your own custom characters.
+* **Direct Messages (DMs)**: Instagram-style inbox listing every persona with the latest message, time, and unread dot (plus a badge on the DM icon). Open a conversation to chat 1-on-1. Chats persist across restarts, errors are shown separately (never mixed into the chat history), and you can create or delete custom characters.
 * **Search**: Filter posts by caption, `#hashtag`, persona name, or handle, and jump to persona profiles.
 * **Create Posts**: Pick a photo from the gallery or camera, add a caption, and share it. A couple of personas react with AI comments.
 * **Activity**: Notifications for AI replies and reactions, with an unread badge on the tab bar.
-* **Profiles**: Your posts and saved posts, plus persona profiles with a "Message" button that opens their DM.
+* **Profiles & Settings**: Your posts and saved posts, plus persona profiles with a "Message" button that opens their DM. The settings button on your profile lets you edit your name, username (nickname), and bio.
+* **Branding**: Original Assence logo (speech bubble + AI sparkle), launcher icons, and a native + animated splash screen.
 * **Stories**: Post your own story (photo or text, expires after 24h) and watch persona stories in a full-screen viewer. Story replies go to that persona's DM.
 * **Node-based Character Memory**: Each persona keeps its own system prompt and isolated conversation history, inspired by LangGraph nodes.
 
@@ -56,6 +57,13 @@
    ```bash
    flutter analyze
    flutter test
+   ```
+
+4. **Regenerate the app icon / splash** (only after changing the logo in `lib/widgets/assence_logo.dart`)
+   ```bash
+   flutter test tool/render_brand_assets.dart
+   dart run flutter_launcher_icons
+   dart run flutter_native_splash:create
    ```
 
 ---

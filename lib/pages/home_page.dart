@@ -6,7 +6,10 @@ import 'package:assence/pages/feed_page.dart';
 import 'package:assence/pages/notifications_page.dart';
 import 'package:assence/pages/profile_page.dart';
 import 'package:assence/pages/search_page.dart';
+import 'package:assence/pages/settings_page.dart';
+import 'package:assence/state/chat_store.dart';
 import 'package:assence/state/notification_store.dart';
+import 'package:assence/state/user_profile_store.dart';
 import 'package:assence/widgets/assence_logo.dart';
 
 class HomePage extends StatefulWidget {
@@ -51,21 +54,43 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final int unread = context.watch<NotificationStore>().unreadCount;
+    final bool onProfile = _currentIndex == profileTab;
+    final int unreadDms = context.watch<ChatStore>().unreadCount;
 
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xfff8faf8),
         centerTitle: false,
         elevation: 1.0,
-        title: const AssenceLogo(height: 26),
+        // 프로필 탭에서는 인스타그램처럼 내 계정명과 설정 버튼을 보여준다.
+        title: onProfile
+            ? Text(
+                context.watch<UserProfileStore>().handle,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              )
+            : const AssenceLogo(height: 26),
         actions: <Widget>[
           Padding(
             padding: const EdgeInsets.only(right: 12.0),
-            child: IconButton(
-              icon: const Icon(Icons.send),
-              tooltip: 'AI 채팅',
-              onPressed: () => openChat(context),
-            ),
+            child: onProfile
+                ? IconButton(
+                    icon: const Icon(Icons.settings_outlined),
+                    tooltip: '설정',
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const SettingsPage(),
+                      ),
+                    ),
+                  )
+                : IconButton(
+                    icon: Badge(
+                      isLabelVisible: unreadDms > 0,
+                      label: Text('$unreadDms'),
+                      child: const Icon(Icons.send),
+                    ),
+                    tooltip: 'AI 채팅',
+                    onPressed: () => openChat(context),
+                  ),
           ),
         ],
       ),

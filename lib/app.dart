@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:assence/pages/home_page.dart';
+import 'package:assence/pages/splash_page.dart';
 import 'package:assence/services/gemini_service.dart';
 import 'package:assence/services/local_store.dart';
 import 'package:assence/state/chat_store.dart';
@@ -8,6 +9,7 @@ import 'package:assence/state/feed_store.dart';
 import 'package:assence/state/notification_store.dart';
 import 'package:assence/state/persona_store.dart';
 import 'package:assence/state/story_store.dart';
+import 'package:assence/state/user_profile_store.dart';
 
 /// 앱 전역 상태. 저장된 데이터는 생성 시점에 복원된다.
 class AppStores {
@@ -16,6 +18,7 @@ class AppStores {
   final ChatStore chat;
   final FeedStore feed;
   final StoryStore stories;
+  final UserProfileStore profile;
 
   AppStores._(
     this.personas,
@@ -23,6 +26,7 @@ class AppStores {
     this.chat,
     this.feed,
     this.stories,
+    this.profile,
   );
 
   factory AppStores.create(LocalStore local, GeminiService gemini) {
@@ -34,6 +38,7 @@ class AppStores {
       ChatStore(local, gemini, personas),
       FeedStore(local, gemini, personas, notifications),
       StoryStore(local),
+      UserProfileStore(local),
     );
   }
 }
@@ -41,7 +46,10 @@ class AppStores {
 class AssenceApp extends StatelessWidget {
   final AppStores stores;
 
-  const AssenceApp({super.key, required this.stores});
+  /// 처음에 로고 시작 화면을 보여줄지 여부. 테스트에서는 바로 홈으로 간다.
+  final bool showSplash;
+
+  const AssenceApp({super.key, required this.stores, this.showSplash = true});
 
   @override
   Widget build(BuildContext context) {
@@ -54,6 +62,7 @@ class AssenceApp extends StatelessWidget {
         ChangeNotifierProvider<ChatStore>.value(value: stores.chat),
         ChangeNotifierProvider<FeedStore>.value(value: stores.feed),
         ChangeNotifierProvider<StoryStore>.value(value: stores.stories),
+        ChangeNotifierProvider<UserProfileStore>.value(value: stores.profile),
       ],
       child: MaterialApp(
         title: 'Assence',
@@ -74,7 +83,7 @@ class AssenceApp extends StatelessWidget {
             bodyLarge: TextStyle(color: Colors.black, fontFamily: 'Aveny'),
           ),
         ),
-        home: const HomePage(),
+        home: showSplash ? const SplashPage() : const HomePage(),
       ),
     );
   }
