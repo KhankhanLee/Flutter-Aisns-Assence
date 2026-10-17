@@ -4,12 +4,14 @@ import 'package:assence/models/persona.dart';
 import 'package:assence/models/story.dart';
 import 'package:assence/state/chat_store.dart';
 import 'package:assence/state/persona_store.dart';
+import 'package:assence/state/story_store.dart';
 import 'package:assence/utils/format.dart';
 import 'package:assence/widgets/app_image.dart';
 import 'package:assence/widgets/author_avatar.dart';
 
 /// 전체 화면 스토리 뷰어. 좌/우 탭으로 이동하고 일정 시간이 지나면 다음으로 넘어간다.
-/// 페르소나 스토리에 답장하면 해당 페르소나와의 DM으로 전송된다.
+/// 페르소나 스토리에는 좋아요를 누르거나 답장할 수 있고(답장은 DM으로 간다),
+/// 내 스토리에서는 누가 봤는지 볼 수 있다.
 class StoryViewerPage extends StatefulWidget {
   static const Duration storyDuration = Duration(seconds: 5);
 
@@ -84,10 +86,7 @@ class _StoryViewerPageState extends State<StoryViewerPage>
     final String text = _reply.text.trim();
     if (text.isEmpty) return;
     final Story story = _story;
-    context.read<ChatStore>().send(
-      story.authorId,
-      '[스토리 답장] "${story.text}"\n$text',
-    );
+    context.read<ChatStore>().send(story.authorId, text, story: story);
     _reply.clear();
     _replyFocus.unfocus();
     ScaffoldMessenger.of(context).showSnackBar(
@@ -95,11 +94,23 @@ class _StoryViewerPageState extends State<StoryViewerPage>
     );
   }
 
+  /// 내 스토리를 본 사람 목록. 보는 동안은 자동 넘김을 멈춘다.
+  Future<void> _showViewers(Story story) async {
+    _progress.stop();
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (_) => _ViewersSheet(story: story),
+    );
+    if (mounted && !_progress.isCompleted) _progress.forward();
+  }
+
   @override
   Widget build(BuildContext context) {
     final Story story = _story;
     final PersonaStore personas = context.watch<PersonaStore>();
+    final StoryStore stories = context.watch<StoryStore>();
     final bool fromPersona = story.authorId != myUserId;
+    final bool liked = stories.isLiked(story.id);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -234,11 +245,34 @@ class _StoryViewerPageState extends State<StoryViewerPage>
                       ),
                     ),
                     IconButton(
+                      icon: Icon(
+                        liked ? Icons.favorite : Icons.favorite_border,
+                        color: liked ? Colors.redAccent : Colors.white,
+                      ),
+                      tooltip: liked ? '좋아요 취소' : '좋아요',
+                      onPressed: () => stories.toggleLike(story.id),
+                    ),
+                    IconButton(
                       icon: const Icon(Icons.send, color: Colors.white),
                       tooltip: '답장 보내기',
                       onPressed: _sendReply,
                     ),
                   ],
+                ),
+              )
+            else
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => _showViewers(story),
+                  icon: const Icon(
+                    Icons.remove_red_eye_outlined,
+                    color: Colors.white,
+                  ),
+                  label: Text(
+                    '활동 ${stories.viewersOf(story).length}',
+                    style: const TextStyle(color: Colors.white),
+                  ),
                 ),
               ),
           ],
@@ -275,6 +309,65 @@ class _ProgressBars extends StatelessWidget {
                   backgroundColor: Colors.white30,
                   valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 내 스토리를 본 사람과 좋아요 표시.
+class _ViewersSheet extends StatelessWidget {
+  final Story story;
+
+  const _ViewersSheet({required this.story});
+
+  @override
+  Widget build(BuildContext context) {
+    final List<StoryView> viewers = context.watch<StoryStore>().viewersOf(
+      story,
+    );
+    final PersonaStore personas = context.watch<PersonaStore>();
+    final int likes = viewers.where((StoryView v) => v.liked).length;
+
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              '조회 ${viewers.length}명${likes > 0 ? ' · 좋아요 $likes' : ''}',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+          ),
+          if (viewers.isEmpty)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 24),
+              child: Text(
+                '아직 아무도 안 봤어요. 친구들이 보면 여기에 나타나요.',
+                style: TextStyle(color: Colors.grey),
+              ),
+            )
+          else
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: <Widget>[
+                  for (final StoryView view in viewers)
+                    ListTile(
+                      leading: AuthorAvatar(authorId: view.personaId),
+                      title: Text(
+                        personas.byId(view.personaId)?.handle ?? view.personaId,
+                      ),
+                      subtitle: Text(formatTimeAgo(view.at)),
+                      trailing: view.liked
+                          ? const Icon(Icons.favorite, color: Colors.redAccent)
+                          : null,
+                    ),
+                ],
               ),
             ),
         ],

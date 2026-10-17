@@ -95,7 +95,7 @@ void main() {
   test('HTTP 오류는 상태 코드와 함께 http 예외', () async {
     final GeminiService service = GeminiService(
       apiKey: 'k',
-      client: MockClient((_) async => http.Response('{"error":{}}', 429)),
+      client: MockClient((_) async => http.Response('{"error":{}}', 500)),
     );
 
     await expectLater(
@@ -103,7 +103,7 @@ void main() {
       throwsA(
         isA<GeminiException>()
             .having((GeminiException e) => e.kind, 'kind', GeminiErrorKind.http)
-            .having((GeminiException e) => e.statusCode, 'statusCode', 429),
+            .having((GeminiException e) => e.statusCode, 'statusCode', 500),
       ),
     );
   });

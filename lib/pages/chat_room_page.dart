@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:assence/models/chat_message.dart';
 import 'package:assence/models/persona.dart';
+import 'package:assence/models/story.dart';
 import 'package:assence/navigation.dart';
 import 'package:assence/state/ai_settings_store.dart';
 import 'package:assence/state/chat_store.dart';
 import 'package:assence/state/persona_store.dart';
 import 'package:assence/widgets/api_key_banner.dart';
 import 'package:assence/utils/humanize.dart';
+import 'package:assence/widgets/app_image.dart';
 import 'package:assence/widgets/author_avatar.dart';
 
 /// 페르소나 한 명과의 DM 대화방.
@@ -156,6 +158,10 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                             : humanizeReply(message.text, maxEmoji: 99),
                         isUser: message.isUser,
                         personaId: persona.id,
+                        story: message.story,
+                        storyLabel: message.isUser
+                            ? '${persona.name}님의 스토리에 답장함'
+                            : '회원님의 스토리에 답장했어요',
                       );
                     },
                   ),
@@ -299,16 +305,21 @@ class _Bubble extends StatelessWidget {
   final String text;
   final bool isUser;
   final String personaId;
+  final SharedStory? story;
+  final String storyLabel;
 
   const _Bubble({
     required this.text,
     required this.isUser,
     required this.personaId,
+    this.story,
+    this.storyLabel = '',
   });
 
   @override
   Widget build(BuildContext context) {
-    final Widget bubble = Container(
+    final SharedStory? shared = story;
+    final Widget textBubble = Container(
       constraints: BoxConstraints(
         maxWidth: MediaQuery.sizeOf(context).width * 0.7,
       ),
@@ -322,6 +333,23 @@ class _Bubble extends StatelessWidget {
         style: TextStyle(color: isUser ? Colors.white : Colors.black),
       ),
     );
+    final Widget bubble = shared == null
+        ? textBubble
+        : Column(
+            crossAxisAlignment: isUser
+                ? CrossAxisAlignment.end
+                : CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                storyLabel,
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 4),
+              _StoryThumb(story: shared),
+              const SizedBox(height: 4),
+              textBubble,
+            ],
+          );
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
@@ -337,6 +365,51 @@ class _Bubble extends StatelessWidget {
           ],
           bubble,
         ],
+      ),
+    );
+  }
+}
+
+/// DM에 함께 보이는 스토리 미리보기. 24시간이 지나면 만료 표시만 남는다.
+class _StoryThumb extends StatelessWidget {
+  final SharedStory story;
+
+  const _StoryThumb({required this.story});
+
+  @override
+  Widget build(BuildContext context) {
+    final bool expired =
+        DateTime.now().difference(story.createdAt) >= Story.lifetime;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        width: 96,
+        height: 150,
+        child: expired
+            ? Container(
+                color: Colors.grey[200],
+                alignment: Alignment.center,
+                padding: const EdgeInsets.all(8),
+                child: const Text(
+                  '스토리가 만료됐어요',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              )
+            : story.imagePath.isEmpty
+            ? Container(
+                color: const Color(0xff6a3df0),
+                alignment: Alignment.center,
+                padding: const EdgeInsets.all(8),
+                child: Text(
+                  story.text,
+                  maxLines: 5,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                ),
+              )
+            : AppImage(story.imagePath, fit: BoxFit.cover),
       ),
     );
   }

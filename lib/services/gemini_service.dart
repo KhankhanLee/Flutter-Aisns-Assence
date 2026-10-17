@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:assence/models/chat_message.dart';
 import 'package:assence/models/persona.dart';
 import 'package:assence/models/post.dart';
+import 'package:assence/services/claude_client.dart';
 import 'package:assence/utils/humanize.dart';
 import 'package:http/http.dart' as http;
 
@@ -15,30 +16,58 @@ enum GeminiErrorKind {
   network,
   http,
   emptyResponse,
+
+  /// 요청 한도 초과 (HTTP 429). [GeminiException.daily]면 하루 한도.
+  rateLimited,
+
+  /// Claude 선불 크레딧 부족.
+  noCredit,
 }
+
+/// 앱에서 쓰는 AI. 설정 > AI 연결에서 고른다.
+enum AiProvider { gemini, claude }
+
+/// 요청에 함께 보내는 사진 (스토리 반응용).
+typedef ChatImage = ({Uint8List bytes, String mimeType});
 
 class GeminiException implements Exception {
   final GeminiErrorKind kind;
   final String message;
   final int? statusCode;
 
-  const GeminiException(this.kind, this.message, {this.statusCode});
+  /// 한도 초과일 때 다시 시도해도 되는 시각까지 남은 시간 (응답에 있으면).
+  final Duration? retryAfter;
+
+  /// 분당 한도가 아니라 하루 한도를 다 쓴 경우.
+  final bool daily;
+
+  const GeminiException(
+    this.kind,
+    this.message, {
+    this.statusCode,
+    this.retryAfter,
+    this.daily = false,
+  });
 
   /// 화면에 그대로 보여줄 수 있는 짧은 안내 문구.
   String get userMessage {
     switch (kind) {
       case GeminiErrorKind.missingApiKey:
-        return 'Gemini API 키가 설정되지 않았어요. 프로필 > 설정 > Gemini API 키에서 입력해 주세요.';
+        return 'AI 키가 설정되지 않았어요. 프로필 > 설정 > AI 연결에서 입력해 주세요.';
       case GeminiErrorKind.invalidApiKey:
         return 'API 키가 올바르지 않아요. 설정에서 키를 다시 확인해 주세요.';
       case GeminiErrorKind.modelUnavailable:
-        return '이 키로 쓸 수 있는 Gemini 모델을 찾지 못했어요. 설정에서 연결 테스트를 해 주세요.';
+        return '이 키로 쓸 수 있는 모델을 찾지 못했어요. 설정에서 연결 테스트를 해 주세요.';
       case GeminiErrorKind.network:
         return '네트워크 연결이 불안정해요. 잠시 후 다시 시도해 주세요.';
+      case GeminiErrorKind.rateLimited:
+        return daily
+            ? '오늘 쓸 수 있는 무료 사용량을 다 썼어요. 내일 다시 시도하거나 설정 > AI 연결에서 다른 AI를 골라 주세요.'
+            : '잠깐 요청이 몰렸어요. 1분쯤 뒤에 다시 시도해 주세요.';
+      case GeminiErrorKind.noCredit:
+        return 'Claude 크레딧이 부족해요. Claude Console에서 충전해 주세요.';
       case GeminiErrorKind.http:
-        return statusCode == 429
-            ? '요청이 너무 많아요. 잠시 후 다시 시도해 주세요.'
-            : 'AI 응답을 받지 못했어요. (오류 $statusCode)';
+        return 'AI 응답을 받지 못했어요. (오류 $statusCode)';
       case GeminiErrorKind.emptyResponse:
         return 'AI가 답변을 만들지 못했어요. 다시 시도해 주세요.';
     }
@@ -51,6 +80,8 @@ class GeminiException implements Exception {
 /// 댓글 스레드의 한 줄 (작성자 표시 이름 + 내용).
 typedef CommentLine = ({String author, String text});
 
+/// AI 요청의 공통 진입점. 캐릭터 프롬프트·말투 규칙·후처리는 여기서 만들고,
+/// 실제 호출은 [provider]에 따라 Gemini 또는 [ClaudeClient]로 보낸다.
 class GeminiService {
   /// 저장된 모델이 없을 때 쓰는 기본값. 이 키로 쓸 수 없으면
   /// [resolveModel]로 쓸 수 있는 모델을 찾아 자동으로 바꾼다.
@@ -61,28 +92,66 @@ class GeminiService {
   static const String _baseUrl =
       'https://generativelanguage.googleapis.com/v1beta';
 
+  /// 한도에 걸렸을 때 다른 모델이 없으면 이 시간 이하로만 기다렸다 다시 시도한다.
+  static const Duration maxRetryWait = Duration(seconds: 20);
+
+  /// Gemini API 키.
   String apiKey;
+
+  /// 기본 Gemini 모델. 한도에 걸려 다른 모델을 잠시 써도 이 값은 그대로 둔다.
   String model;
 
   /// 사진 생성용 모델. 처음 필요할 때 [resolveImageModel]로 찾는다.
   String? imageModel;
+
+  AiProvider provider = AiProvider.gemini;
+  final ClaudeClient claude;
+
   final Duration timeout;
   final http.Client _client;
 
   /// 프롬프트에 넣는 "지금" (요일·시간대에 맞는 자연스러운 대화용).
   final DateTime Function() _now;
 
+  /// 한도에 걸린 뒤 다시 시도하기 전에 기다리는 함수. 테스트에서는 바로 끝낸다.
+  final Future<void> Function(Duration) _sleep;
+
+  /// 한도에 걸린 Gemini 모델 → 다시 써도 되는 시각.
+  final Map<String, DateTime> _restingUntil = <String, DateTime>{};
+
+  /// 이 키로 쓸 수 있는 대화용 모델 (우선순위순). 처음 필요할 때 받아 둔다.
+  List<String>? _modelChain;
+
   /// 모델을 자동으로 바꿨을 때 호출된다 (설정 저장용).
   void Function(String model)? onModelChanged;
 
   GeminiService({
-    required this.apiKey,
-    this.model = defaultModel,
-    this.timeout = const Duration(seconds: 30),
+    required String apiKey,
+    String model = defaultModel,
+    Duration timeout = const Duration(seconds: 30),
     http.Client? client,
     DateTime Function()? now,
-  }) : _client = client ?? http.Client(),
-       _now = now ?? DateTime.now;
+    Future<void> Function(Duration)? sleep,
+  }) : this._(
+         apiKey: apiKey,
+         model: model,
+         timeout: timeout,
+         client: client ?? http.Client(),
+         now: now ?? DateTime.now,
+         sleep: sleep ?? Future<void>.delayed,
+       );
+
+  GeminiService._({
+    required this.apiKey,
+    required this.model,
+    required this.timeout,
+    required http.Client client,
+    required DateTime Function() now,
+    required Future<void> Function(Duration) sleep,
+  }) : _client = client,
+       _now = now,
+       _sleep = sleep,
+       claude = ClaudeClient(client: client, timeout: timeout);
 
   /// `--dart-define=GEMINI_API_KEY=...` 값으로 만든 서비스.
   /// 앱 설정에서 입력한 키가 있으면 [configure]로 덮어쓴다.
@@ -91,11 +160,40 @@ class GeminiService {
     client: client,
   );
 
-  bool get isConfigured => apiKey.isNotEmpty;
+  /// 지금 고른 AI의 키가 있는지.
+  bool get isConfigured => hasKey(provider);
+
+  bool hasKey(AiProvider p) => switch (p) {
+    AiProvider.gemini => apiKey.isNotEmpty,
+    AiProvider.claude => claude.isConfigured,
+  };
 
   void configure({required String apiKey, String? model}) {
     this.apiKey = apiKey.trim();
     if (model != null && model.isNotEmpty) this.model = model;
+  }
+
+  bool _isResting(String id) {
+    final DateTime? until = _restingUntil[id];
+    return until != null && _now().isBefore(until);
+  }
+
+  /// 지금 실제로 쓰는 Gemini 모델. 기본 모델이 한도에 걸려 쉬는 중이면
+  /// 이미 받아 둔 목록에서 다음 모델을 돌려준다.
+  String get activeGeminiModel {
+    if (!_isResting(model)) return model;
+    for (final String id in _modelChain ?? <String>[]) {
+      if (!_isResting(id)) return id;
+    }
+    return model;
+  }
+
+  /// 한도에 걸린 모델은 [GeminiException.retryAfter]만큼, 하루 한도면 12시간 쉰다.
+  void _rest(String id, GeminiException e) {
+    final Duration wait = e.daily
+        ? const Duration(hours: 12)
+        : (e.retryAfter ?? const Duration(minutes: 1));
+    _restingUntil[id] = _now().add(wait);
   }
 
   Map<String, String> get _headers => <String, String>{
@@ -116,6 +214,7 @@ class GeminiService {
   static GeminiException _httpError(http.Response response) {
     final String body = utf8.decode(response.bodyBytes, allowMalformed: true);
     final int code = response.statusCode;
+    if (code == 429) return _rateLimitError(body);
     if (body.contains('API_KEY_INVALID') ||
         body.contains('API key not valid') ||
         code == 401) {
@@ -138,9 +237,55 @@ class GeminiService {
     return GeminiException(GeminiErrorKind.http, body, statusCode: code);
   }
 
+  /// 429 응답 본문에서 다시 시도할 시각(RetryInfo)과 하루 한도인지(QuotaFailure)를 읽는다.
+  static GeminiException _rateLimitError(String body) {
+    Duration? retryAfter;
+    bool daily = false;
+    try {
+      final Object? decoded = jsonDecode(body);
+      final Object? error = decoded is Map<String, dynamic>
+          ? decoded['error']
+          : null;
+      final Object? details = error is Map<String, dynamic>
+          ? error['details']
+          : null;
+      for (final Object? detail in details is List<dynamic> ? details : []) {
+        if (detail is! Map<String, dynamic>) continue;
+        final String type = detail['@type']?.toString() ?? '';
+        if (type.endsWith('RetryInfo')) {
+          final double? seconds = double.tryParse(
+            (detail['retryDelay']?.toString() ?? '').replaceAll('s', ''),
+          );
+          if (seconds != null) {
+            retryAfter = Duration(milliseconds: (seconds * 1000).round());
+          }
+        } else if (type.endsWith('QuotaFailure')) {
+          final Object? violations = detail['violations'];
+          daily =
+              daily ||
+              (violations is List<dynamic> &&
+                  violations.any(
+                    (dynamic v) =>
+                        v is Map<String, dynamic> &&
+                        (v['quotaId']?.toString() ?? '').contains('PerDay'),
+                  ));
+        }
+      }
+    } on FormatException {
+      // 본문이 JSON이 아니면 분당 한도로 본다.
+    }
+    return GeminiException(
+      GeminiErrorKind.rateLimited,
+      body,
+      statusCode: 429,
+      retryAfter: retryAfter,
+      daily: daily,
+    );
+  }
+
   /// 이 키로 generateContent를 쓸 수 있는 모델 ID 목록.
   Future<List<String>> listModels() async {
-    if (!isConfigured) {
+    if (apiKey.isEmpty) {
       throw const GeminiException(GeminiErrorKind.missingApiKey, 'no key');
     }
     final http.Response response = await _send(
@@ -168,9 +313,19 @@ class GeminiService {
     ];
   }
 
-  /// 대화용으로 가장 알맞은 모델을 고른다: 최신 버전의 일반 Flash →
-  /// Flash-Lite → 그 밖의 Gemini 순. 정식 버전을 preview보다 우선한다.
-  static String? pickChatModel(List<String> ids) {
+  /// 대화용으로 가장 알맞은 모델을 고른다 ([rankChatModels]의 첫 번째).
+  static String? pickChatModel(List<String> ids) =>
+      rankChatModels(ids).firstOrNull;
+
+  /// 대화용 모델을 쓸 순서대로 늘어놓는다: 최신 버전의 일반 Flash →
+  /// Flash-Lite → 그 밖의 Gemini → Gemma. 같은 종류면 정식 버전을 preview보다
+  /// 우선한다. 한도는 모델마다 따로라서, 앞 모델이 한도에 걸리면 다음 모델을 쓴다.
+  static List<String> rankChatModels(List<String> ids) => <String>[
+    ..._rankGemini(ids),
+    ..._rankGemma(ids),
+  ];
+
+  static List<String> _rankGemini(List<String> ids) {
     const List<String> excluded = <String>[
       'embedding',
       'image',
@@ -190,7 +345,6 @@ class GeminiService {
         .where((String id) => id.startsWith('gemini-'))
         .where((String id) => !excluded.any(id.contains))
         .toList();
-    if (candidates.isEmpty) return null;
 
     double version(String id) =>
         double.tryParse(
@@ -213,12 +367,33 @@ class GeminiService {
       if (byVersion != 0) return byVersion;
       return a.length.compareTo(b.length); // 날짜 접미사 없는 별칭 우선
     });
-    return candidates.first;
+    return candidates;
   }
+
+  /// Gemma는 무료 한도가 넉넉해서 마지막 대체 모델로 쓴다. 최신·큰 모델 우선.
+  static List<String> _rankGemma(List<String> ids) {
+    double number(String id, RegExp pattern) =>
+        double.tryParse(pattern.firstMatch(id)?.group(1) ?? '') ?? 0;
+    final RegExp version = RegExp(r'^gemma-(\d+(?:\.\d+)?)');
+    final RegExp size = RegExp(r'(\d+)b');
+    final List<String> candidates = ids
+        .where((String id) => id.startsWith('gemma-') && id.endsWith('-it'))
+        .toList();
+    candidates.sort((String a, String b) {
+      final int byVersion = number(b, version).compareTo(number(a, version));
+      if (byVersion != 0) return byVersion;
+      return number(b, size).compareTo(number(a, size));
+    });
+    return candidates;
+  }
+
+  static bool _isGemma(String id) => id.startsWith('gemma-');
 
   /// 이 키로 쓸 수 있는 모델을 찾아 [model]을 바꾼다.
   Future<String> resolveModel() async {
-    final String? picked = pickChatModel(await listModels());
+    final List<String> chain = rankChatModels(await listModels());
+    _modelChain = chain;
+    final String? picked = chain.firstOrNull;
     if (picked == null) {
       throw const GeminiException(
         GeminiErrorKind.modelUnavailable,
@@ -275,7 +450,7 @@ class GeminiService {
     Uint8List? reference,
     String referenceMimeType = 'image/jpeg',
   }) async {
-    if (!isConfigured) {
+    if (apiKey.isEmpty) {
       throw const GeminiException(GeminiErrorKind.missingApiKey, 'no key');
     }
     final String model = imageModel ?? await resolveImageModel();
@@ -350,40 +525,162 @@ class GeminiService {
   }
 
   /// [persona]를 system instruction으로, [history]를 대화 맥락으로 답변을 만든다.
+  /// [image]는 마지막 user 메시지에 함께 보낸다.
+  ///
+  /// [background]는 예약 게시물처럼 사용자가 기다리지 않는 요청이다. 한도에
+  /// 걸리면 다른 모델·다른 AI로 넘어가지 않고 바로 실패해서, 남은 한도를
+  /// 사용자의 DM·댓글에 양보한다.
   Future<String> generateReply({
     required String persona,
     required List<ChatMessage> history,
+    ChatImage? image,
+    bool background = false,
   }) async {
     if (!isConfigured) {
-      throw const GeminiException(
-        GeminiErrorKind.missingApiKey,
-        'GEMINI_API_KEY is empty',
-      );
+      throw const GeminiException(GeminiErrorKind.missingApiKey, 'no key');
     }
+    final List<ChatMessage> messages = _prepare(history);
     try {
-      return await _generate(persona, history);
+      return await _replyWith(provider, persona, messages, image, background);
     } on GeminiException catch (e) {
-      // 모델이 없어졌거나 이 키로 못 쓰면, 쓸 수 있는 모델로 바꿔 한 번 더 시도한다.
-      if (e.kind != GeminiErrorKind.modelUnavailable) rethrow;
-      final String previous = model;
-      if (await resolveModel() == previous) rethrow;
-      return _generate(persona, history);
+      // 두 AI의 키가 다 있으면, 한도나 크레딧 때문에 막혔을 때 다른 AI로 한 번 더 시도한다.
+      final AiProvider other = provider == AiProvider.gemini
+          ? AiProvider.claude
+          : AiProvider.gemini;
+      final bool blocked =
+          e.kind == GeminiErrorKind.rateLimited ||
+          e.kind == GeminiErrorKind.noCredit;
+      if (background || !blocked || !hasKey(other)) rethrow;
+      return _replyWith(other, persona, messages, image, background);
     }
   }
 
-  Future<String> _generate(String persona, List<ChatMessage> history) async {
+  Future<String> _replyWith(
+    AiProvider p,
+    String system,
+    List<ChatMessage> messages,
+    ChatImage? image,
+    bool background,
+  ) => switch (p) {
+    AiProvider.gemini => _geminiReply(system, messages, image, background),
+    AiProvider.claude => claude.generate(
+      system: system,
+      messages: messages,
+      image: image,
+    ),
+  };
+
+  /// 기본 모델로 보내고, 한도에 걸리면 이 키로 쓸 수 있는 다음 모델로 넘어간다.
+  /// 넘어갈 모델이 없고 잠깐만 기다리면 되면 기다렸다 한 번 더 보낸다.
+  Future<String> _geminiReply(
+    String system,
+    List<ChatMessage> messages,
+    ChatImage? image,
+    bool background,
+  ) async {
+    final Set<String> tried = <String>{};
+    String? current = model;
+    if (_isResting(model)) {
+      if (background) {
+        throw const GeminiException(
+          GeminiErrorKind.rateLimited,
+          'default model is resting',
+        );
+      }
+      current = await _nextModel(tried);
+    }
+    bool waited = false;
+    GeminiException? last;
+    while (current != null) {
+      final String id = current;
+      tried.add(id);
+      try {
+        return await _generate(id, system, messages, image);
+      } on GeminiException catch (e) {
+        if (e.kind == GeminiErrorKind.modelUnavailable && id == model) {
+          // 기본 모델이 없어졌거나 이 키로 못 쓰면 쓸 수 있는 모델로 바꾼다.
+          final String previous = model;
+          if (await resolveModel() == previous) rethrow;
+          current = model;
+          continue;
+        }
+        if (e.kind == GeminiErrorKind.modelUnavailable) {
+          _restingUntil[id] = _now().add(const Duration(days: 1));
+        } else if (e.kind == GeminiErrorKind.rateLimited) {
+          _rest(id, e);
+        } else {
+          rethrow;
+        }
+        if (background) rethrow;
+        last = e;
+        current = await _nextModel(tried);
+        final Duration? wait = e.retryAfter;
+        if (current == null &&
+            !waited &&
+            !e.daily &&
+            wait != null &&
+            wait <= maxRetryWait) {
+          waited = true;
+          await _sleep(wait);
+          _restingUntil.remove(id);
+          tried.remove(id);
+          current = id;
+        }
+      }
+    }
+    throw last ??
+        const GeminiException(GeminiErrorKind.rateLimited, 'all resting');
+  }
+
+  /// 아직 안 써 본, 쉬는 중이 아닌 다음 모델. 목록을 못 받으면 null.
+  Future<String?> _nextModel(Set<String> tried) async {
+    List<String>? chain = _modelChain;
+    if (chain == null) {
+      try {
+        chain = _modelChain = rankChatModels(await listModels());
+      } on GeminiException {
+        return null;
+      }
+    }
+    for (final String id in chain) {
+      if (!tried.contains(id) && !_isResting(id)) return id;
+    }
+    return null;
+  }
+
+  Future<String> _generate(
+    String modelId,
+    String system,
+    List<ChatMessage> messages,
+    ChatImage? image,
+  ) async {
+    // Gemma는 system instruction을 받지 않아서 설정을 첫 user 메시지 앞에 붙인다.
+    final bool gemma = _isGemma(modelId);
+    final int lastUser = messages.lastIndexWhere((ChatMessage m) => m.isUser);
     final Map<String, dynamic> requestBody = <String, dynamic>{
-      'system_instruction': <String, dynamic>{
-        'parts': <Map<String, String>>[
-          <String, String>{'text': persona},
-        ],
-      },
+      if (!gemma)
+        'system_instruction': <String, dynamic>{
+          'parts': <Map<String, String>>[
+            <String, String>{'text': system},
+          ],
+        },
       'contents': <dynamic>[
-        for (final ChatMessage message in _mergeConsecutive(history))
+        for (int i = 0; i < messages.length; i++)
           <String, dynamic>{
-            'role': message.role,
-            'parts': <Map<String, String>>[
-              <String, String>{'text': message.text},
+            'role': messages[i].role,
+            'parts': <dynamic>[
+              if (image != null && i == lastUser)
+                <String, dynamic>{
+                  'inline_data': <String, String>{
+                    'mime_type': image.mimeType,
+                    'data': base64Encode(image.bytes),
+                  },
+                },
+              <String, String>{
+                'text': gemma && i == 0
+                    ? '[너의 설정]\n$system\n\n[메시지]\n${messages[i].text}'
+                    : messages[i].text,
+              },
             ],
           },
       ],
@@ -393,7 +690,7 @@ class GeminiService {
 
     final http.Response response = await _send(
       _client.post(
-        Uri.parse('$_baseUrl/models/$model:generateContent'),
+        Uri.parse('$_baseUrl/models/$modelId:generateContent'),
         headers: _headers,
         body: jsonEncode(requestBody),
       ),
@@ -415,11 +712,38 @@ class GeminiService {
     return text;
   }
 
-  /// DM 말풍선이 여러 개로 나뉘어 저장되므로, 보낼 때는 같은 사람이 연달아 보낸
-  /// 메시지를 한 덩어리로 합쳐 user/model이 번갈아 오게 한다.
-  static List<ChatMessage> _mergeConsecutive(List<ChatMessage> history) {
-    final List<ChatMessage> merged = <ChatMessage>[];
+  /// 보낼 대화를 Gemini·Claude 형식에 맞춘다.
+  /// - 스토리에 대한 메시지는 어떤 스토리인지 글로 풀어 쓴다.
+  /// - DM 말풍선이 여러 개로 나뉘어 저장되므로, 같은 사람이 연달아 보낸 메시지를
+  ///   한 덩어리로 합쳐 user/model이 번갈아 오게 한다.
+  /// - 대화가 상대(model)의 메시지로 시작하면 앞에 user 맥락을 넣는다.
+  static List<ChatMessage> _prepare(List<ChatMessage> history) {
+    final List<ChatMessage> expanded = <ChatMessage>[];
     for (final ChatMessage message in history) {
+      final SharedStory? story = message.story;
+      if (story == null) {
+        expanded.add(message);
+      } else if (message.isUser) {
+        expanded.add(
+          ChatMessage(
+            role: message.role,
+            text: '(네 스토리 ${_describeStory(story)}에 답장)\n${message.text}',
+          ),
+        );
+      } else {
+        expanded
+          ..add(
+            ChatMessage(
+              role: ChatMessage.userRole,
+              text: '(사용자가 스토리를 올렸어: ${_describeStory(story)})',
+            ),
+          )
+          ..add(message);
+      }
+    }
+
+    final List<ChatMessage> merged = <ChatMessage>[];
+    for (final ChatMessage message in expanded) {
       if (merged.isNotEmpty && merged.last.role == message.role) {
         final ChatMessage last = merged.removeLast();
         merged.add(
@@ -433,7 +757,18 @@ class GeminiService {
         merged.add(message);
       }
     }
+    if (merged.isNotEmpty && !merged.first.isUser) {
+      merged.insert(
+        0,
+        ChatMessage(role: ChatMessage.userRole, text: '(이전 대화)'),
+      );
+    }
     return merged;
+  }
+
+  static String _describeStory(SharedStory story) {
+    final String kind = story.imagePath.isEmpty ? '글 스토리' : '사진 스토리';
+    return story.text.isEmpty ? kind : '$kind, 문구 "${story.text}"';
   }
 
   /// 모든 캐릭터에 공통으로 붙는 "사람처럼 말하기" 규칙.
@@ -528,6 +863,7 @@ class GeminiService {
         persona,
         '친구 인스타 게시물에 댓글을 다는 중이야. 한 문장, 40자 안팎으로 짧게.',
       ),
+      background: true,
       history: <ChatMessage>[
         ChatMessage(
           role: ChatMessage.userRole,
@@ -540,6 +876,41 @@ class GeminiService {
     );
     return singleParagraph(
       humanizeReply(reply, maxEmoji: persona.maxEmoji, speaker: persona.name),
+    );
+  }
+
+  /// [persona]가 사용자의 스토리를 보고 먼저 보내는 DM.
+  /// [image]가 있으면 사진을 직접 보고 반응한다. 사용자가 기다리는 요청이 아니라서
+  /// 한도에 걸리면 바로 실패하고, 다음 확인 때 다시 시도한다.
+  Future<String> generateStoryReaction({
+    required Persona persona,
+    required SharedStory story,
+    required List<ChatMessage> history,
+    ChatImage? image,
+  }) async {
+    final String reply = await generateReply(
+      persona: _systemFor(
+        persona,
+        '친구가 올린 인스타 스토리를 보고 DM으로 반응하는 중이야. '
+        '짧은 메시지 1~2개만, 메시지 사이는 빈 줄로 나눠. 전부 합쳐서 60자 안팎. '
+        '스토리 내용에 바로 반응하고, 사진이 있으면 사진에 보이는 것 얘기해.',
+      ),
+      history: <ChatMessage>[
+        ...history,
+        ChatMessage(
+          role: ChatMessage.userRole,
+          text:
+              '(친구가 방금 스토리를 올렸어. ${_describeStory(story)}. '
+              '이 스토리에 DM으로 반응해줘.)',
+        ),
+      ],
+      image: image,
+      background: true,
+    );
+    return humanizeReply(
+      reply,
+      maxEmoji: persona.maxEmoji,
+      speaker: persona.name,
     );
   }
 
@@ -557,6 +928,7 @@ class GeminiService {
               .join('\n');
     final String reply = await generateReply(
       persona: _systemFor(persona, '오늘 인스타에 올릴 사진을 고르는 중이야.'),
+      background: true,
       history: <ChatMessage>[
         ChatMessage(
           role: ChatMessage.userRole,
@@ -584,6 +956,7 @@ class GeminiService {
         '인스타에 사진을 올리면서 캡션을 쓰는 중이야. 1~2줄로 짧게, 해시태그는 2~4개만 끝에 붙여. '
         '사진 설명문처럼 쓰지 말고 그냥 그날 기분이나 있었던 일을 툭 적듯이.',
       ),
+      background: true,
       history: <ChatMessage>[
         ChatMessage(
           role: ChatMessage.userRole,

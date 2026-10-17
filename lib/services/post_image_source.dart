@@ -24,7 +24,7 @@ class GeminiPostImageSource implements PostImageSource {
     : _enabled = enabled;
 
   @override
-  bool get isEnabled => _enabled() && _gemini.isConfigured;
+  bool get isEnabled => _enabled() && _gemini.hasKey(AiProvider.gemini);
 
   @override
   Future<String> create({

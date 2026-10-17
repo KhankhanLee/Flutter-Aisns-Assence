@@ -1,7 +1,12 @@
+import 'dart:convert';
+
 import 'package:assence/app.dart';
+import 'package:assence/models/chat_message.dart';
+import 'package:assence/pages/api_key_page.dart';
 import 'package:assence/pages/home_page.dart';
 import 'package:assence/pages/splash_page.dart';
 import 'package:assence/pages/story/story_upload_page.dart';
+import 'package:assence/services/gemini_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -26,7 +31,7 @@ void main() {
     await tester.pumpWidget(AssenceApp(stores: stores, showSplash: false));
     await tester.pump();
 
-    expect(find.textContaining('Gemini API 키가 설정되지 않아'), findsOneWidget);
+    expect(find.textContaining('AI 키가 설정되지 않아'), findsOneWidget);
   });
 
   testWidgets('좋아요를 누르면 카운트가 1 늘어난다', (WidgetTester tester) async {
@@ -248,14 +253,19 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('naeun_night'), findsOneWidget);
 
+    // 하트를 누르면 좋아요가 표시된다.
+    await tester.tap(find.byTooltip('좋아요'));
+    await tester.pump();
+    expect(stores.stories.isLiked('naeun_story'), isTrue);
+    expect(find.byTooltip('좋아요 취소'), findsOneWidget);
+
     await tester.enterText(find.byType(TextField), '저도 비 오는 날 좋아해요');
     await tester.tap(find.byTooltip('답장 보내기'));
     await tester.pump(const Duration(milliseconds: 500));
 
-    expect(
-      stores.chat.historyOf('naeun').first.text,
-      contains('저도 비 오는 날 좋아해요'),
-    );
+    final ChatMessage sent = stores.chat.historyOf('naeun').first;
+    expect(sent.text, '저도 비 오는 날 좋아해요');
+    expect(sent.story?.authorId, 'naeun');
     expect(stores.chat.historyOf('naeun').last.text, '답장 고마워요');
 
     await tester.tap(find.byTooltip('닫기'));
@@ -281,6 +291,61 @@ void main() {
 
     expect(stores.stories.myActiveStories.single.text, '오늘도 화이팅');
     expect(stores.stories.myActiveStories.single.imagePath, isEmpty);
+  });
+
+  testWidgets('내 스토리의 활동에서 누가 봤는지와 좋아요를 볼 수 있다', (WidgetTester tester) async {
+    final DateTime now = DateTime.now();
+    final AppStores stores = AppStores.create(
+      await openTestStore(<String, Object>{
+        'my_stories': jsonEncode(<dynamic>[
+          <String, dynamic>{
+            'id': 'mine',
+            'authorId': 'me',
+            'imagePath': '',
+            'text': '오늘 날씨 최고',
+            'createdAt': now
+                .subtract(const Duration(hours: 1))
+                .toIso8601String(),
+            'views': <dynamic>[
+              <String, dynamic>{
+                'personaId': 'hayeon',
+                'at': now
+                    .subtract(const Duration(minutes: 30))
+                    .toIso8601String(),
+                'liked': true,
+              },
+              <String, dynamic>{
+                'personaId': 'jieun',
+                'at': now
+                    .subtract(const Duration(minutes: 10))
+                    .toIso8601String(),
+              },
+              // 아직 안 본 친구는 목록에 나오지 않는다.
+              <String, dynamic>{
+                'personaId': 'naeun',
+                'at': now.add(const Duration(hours: 2)).toIso8601String(),
+              },
+            ],
+          },
+        ]),
+      }),
+      FakeGemini(),
+    );
+    await tester.pumpWidget(AssenceApp(stores: stores, showSplash: false));
+    await tester.pump();
+
+    await tester.tap(find.text('내 스토리'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('오늘 날씨 최고'), findsOneWidget);
+
+    await tester.tap(find.text('활동 2'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('조회 2명 · 좋아요 1'), findsOneWidget);
+    expect(find.text('hayeon_daily'), findsOneWidget);
+    expect(find.text('naeun_night'), findsNothing);
+    expect(find.byIcon(Icons.favorite), findsOneWidget);
   });
 
   testWidgets('시작 화면에서 로고를 보여준 뒤 홈 피드로 넘어간다', (WidgetTester tester) async {
@@ -351,7 +416,7 @@ void main() {
     await tester.pumpWidget(AssenceApp(stores: stores, showSplash: false));
     await tester.pump();
 
-    await tester.tap(find.textContaining('API 키를 입력하세요'));
+    await tester.tap(find.textContaining('Claude 키를 입력하세요'));
     await tester.pumpAndSettle();
 
     expect(find.text('키가 아직 없어요'), findsOneWidget);
@@ -360,6 +425,15 @@ void main() {
       find.widgetWithText(FilledButton, '저장하고 연결 테스트'),
     );
     expect(save.onPressed, isNull);
+
+    // Claude 탭: 발급 주소와 모델 선택이 보이고, 모델을 바꾸면 저장된다.
+    await tester.tap(find.text('Claude'));
+    await tester.pumpAndSettle();
+    expect(find.text(ApiKeyPage.claudeKeyPageUrl), findsOneWidget);
+    expect(find.text('Haiku 5.5'), findsOneWidget);
+    await tester.tap(find.text('Sonnet 5.5'));
+    await tester.pumpAndSettle();
+    expect(stores.ai.modelOf(AiProvider.claude), 'claude-sonnet-5-5');
   });
 
   testWidgets('댓글 창에서 AI 답글에 답글을 달면 AI가 이어서 답한다', (WidgetTester tester) async {
