@@ -7,6 +7,7 @@ import 'package:assence/pages/notifications_page.dart';
 import 'package:assence/pages/profile_page.dart';
 import 'package:assence/pages/search_page.dart';
 import 'package:assence/pages/settings_page.dart';
+import 'package:assence/state/chat_store.dart';
 import 'package:assence/state/notification_store.dart';
 import 'package:assence/state/user_profile_store.dart';
 import 'package:assence/widgets/assence_logo.dart';
@@ -54,6 +55,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final int unread = context.watch<NotificationStore>().unreadCount;
     final bool onProfile = _currentIndex == profileTab;
+    final int unreadDms = context.watch<ChatStore>().unreadCount;
 
     return Scaffold(
       appBar: AppBar(
@@ -81,7 +83,11 @@ class _HomePageState extends State<HomePage> {
                     ),
                   )
                 : IconButton(
-                    icon: const Icon(Icons.send),
+                    icon: Badge(
+                      isLabelVisible: unreadDms > 0,
+                      label: Text('$unreadDms'),
+                      child: const Icon(Icons.send),
+                    ),
                     tooltip: 'AI 채팅',
                     onPressed: () => openChat(context),
                   ),

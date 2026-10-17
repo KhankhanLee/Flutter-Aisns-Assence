@@ -65,7 +65,9 @@ void main() {
     expect(find.widgetWithText(Badge, '1'), findsOneWidget);
   });
 
-  testWidgets('채팅 화면을 닫았다 다시 열어도 대화가 남아 있다', (WidgetTester tester) async {
+  testWidgets('DM 목록에서 대화방을 고르고, 나갔다 들어와도 대화가 남아 있다', (
+    WidgetTester tester,
+  ) async {
     final AppStores stores = await createTestStores(
       FakeGemini(reply: '안녕하세요!'),
     );
@@ -74,18 +76,66 @@ void main() {
 
     await tester.tap(find.byTooltip('AI 채팅'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField).last, '안녕');
+    // 인스타그램처럼 내 계정명과 대화 상대 목록이 보인다.
+    expect(find.text('my_assence'), findsOneWidget);
+    for (final String id in <String>['hayeon', 'suyeon', 'jieun', 'naeun']) {
+      expect(find.byKey(ValueKey<String>('conversation_$id')), findsOneWidget);
+    }
+
+    await tester.tap(find.byKey(const ValueKey<String>('conversation_suyeon')));
+    await tester.pumpAndSettle();
+    expect(find.text('수연에게 첫 메시지를 보내보세요 👋'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), '안녕');
+    await tester.pump();
     await tester.tap(find.byTooltip('보내기'));
     await tester.pumpAndSettle();
     expect(find.text('안녕하세요!'), findsOneWidget);
 
     await tester.pageBack();
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('AI 채팅'));
-    await tester.pumpAndSettle();
+    // 최근 대화가 맨 위로 오고 마지막 메시지가 미리보기로 보인다.
+    final Finder tiles = find.byWidgetPredicate(
+      (Widget w) =>
+          w.key is ValueKey<String> &&
+          (w.key! as ValueKey<String>).value.startsWith('conversation_'),
+    );
+    expect(
+      tester.widget(tiles.first).key,
+      const ValueKey<String>('conversation_suyeon'),
+    );
+    expect(find.text('안녕하세요!'), findsOneWidget);
 
+    await tester.tap(find.byKey(const ValueKey<String>('conversation_suyeon')));
+    await tester.pumpAndSettle();
     expect(find.text('안녕'), findsOneWidget);
     expect(find.text('안녕하세요!'), findsOneWidget);
+  });
+
+  testWidgets('대화방 밖에서 받은 답장은 안 읽음으로 표시되고, 열면 읽음 처리된다', (
+    WidgetTester tester,
+  ) async {
+    final AppStores stores = await createTestStores(
+      FakeGemini(reply: '오늘 밤도 수고했어요'),
+    );
+    // 스토리 답장처럼 대화방을 열지 않고 메시지를 보낸 상황
+    await stores.chat.send('naeun', '잘 자요');
+    expect(stores.chat.unreadCount, 1);
+
+    await tester.pumpWidget(AssenceApp(stores: stores, showSplash: false));
+    await tester.pump();
+    expect(find.widgetWithText(Badge, '1'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('AI 채팅'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey<String>('conversation_naeun')));
+    await tester.pumpAndSettle();
+
+    expect(stores.chat.unreadCount, 0);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(Badge, '1'), findsNothing);
   });
 
   testWidgets('검색 탭에서 해시태그로 게시물을 거르고 페르소나를 찾는다', (WidgetTester tester) async {
@@ -160,7 +210,7 @@ void main() {
     await tester.tap(find.byTooltip('홈'));
     await tester.pumpAndSettle();
     expect(stores.notifications.unreadCount, 0);
-    expect(find.byType(Badge), findsNothing);
+    expect(find.widgetWithText(Badge, '1'), findsNothing);
   });
 
   testWidgets('작성 탭은 사진을 고르기 전에는 공유할 수 없다', (WidgetTester tester) async {

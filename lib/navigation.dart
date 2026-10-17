@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:assence/models/persona.dart';
-import 'package:assence/pages/chat_page.dart';
+import 'package:assence/pages/chat_list_page.dart';
+import 'package:assence/pages/chat_room_page.dart';
 import 'package:assence/pages/persona_profile_page.dart';
 import 'package:assence/pages/post_detail_page.dart';
 
+/// [personaId]가 있으면 그 페르소나와의 대화방, 없으면 DM 목록을 연다.
 Future<void> openChat(BuildContext context, {String? personaId}) {
   return Navigator.of(context).push(
     MaterialPageRoute<void>(
-      builder: (_) => ChatPage(initialPersonaId: personaId),
+      builder: (_) => personaId == null
+          ? const ChatListPage()
+          : ChatRoomPage(personaId: personaId),
     ),
   );
 }
