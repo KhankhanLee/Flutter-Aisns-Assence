@@ -37,8 +37,6 @@ class ChatStore extends ChangeNotifier {
     }
   }
 
-  bool get isConfigured => _gemini.isConfigured;
-
   List<ChatMessage> historyOf(String personaId) =>
       List<ChatMessage>.unmodifiable(_histories[personaId] ?? <ChatMessage>[]);
 

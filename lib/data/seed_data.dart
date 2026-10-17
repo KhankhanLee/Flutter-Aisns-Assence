@@ -41,6 +41,53 @@ const List<Persona> seedPersonas = <Persona>[
   ),
 ];
 
+typedef PersonaPhoto = ({String path, String description});
+
+/// 페르소나가 새 게시물을 올릴 때 고르는 사진. 설명은 캡션 생성 프롬프트에 들어간다.
+const Map<String, List<PersonaPhoto>> personaPhotos =
+    <String, List<PersonaPhoto>>{
+      'hayeon': <PersonaPhoto>[
+        (
+          path: 'images/Hayeon/Cafe.jpg',
+          description: '햇살 드는 카페 창가에서 따뜻한 라떼를 두 손으로 들고 웃는 모습',
+        ),
+        (
+          path: 'images/Hayeon/Hayeon_photo.jpg',
+          description: '아이보리 카디건을 입고 창밖을 바라보며 커피를 마시는 여유로운 오후',
+        ),
+      ],
+      'suyeon': <PersonaPhoto>[
+        (
+          path: 'images/Suyeon/Suyeon_health.jpg',
+          description: '헬스장에서 운동을 막 끝내고 찍은 오운완 사진',
+        ),
+        (
+          path: 'images/Suyeon/Suyeon_running.jpg',
+          description: '노을 지는 강변을 달리는 러닝 사진',
+        ),
+      ],
+      'jieun': <PersonaPhoto>[
+        (
+          path: 'images/Jiun/Jiun_produce.jpg',
+          description: '모니터와 장비로 꾸민 작업 데스크 셋업',
+        ),
+        (
+          path: 'images/Jiun/Jiun_photo.jpg',
+          description: '성수동 팝업스토어에서 찍은 스트릿 패션 데일리룩',
+        ),
+      ],
+      'naeun': <PersonaPhoto>[
+        (
+          path: 'images/Naeun/Naeun_photo.jpg',
+          description: '조용한 밤, 스탠드 불빛 아래에서 글을 쓰는 모습',
+        ),
+        (
+          path: 'images/Naeun/Naeun_book.jpg',
+          description: '비 오는 날 북카페 창가에서 책을 읽는 모습',
+        ),
+      ],
+    };
+
 List<Post> buildSeedPosts(DateTime now) => <Post>[
   Post(
     id: 'seed_hayeon_cafe',

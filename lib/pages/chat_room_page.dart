@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:assence/models/chat_message.dart';
 import 'package:assence/models/persona.dart';
 import 'package:assence/navigation.dart';
+import 'package:assence/state/ai_settings_store.dart';
 import 'package:assence/state/chat_store.dart';
 import 'package:assence/state/persona_store.dart';
 import 'package:assence/widgets/api_key_banner.dart';
@@ -126,7 +127,8 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
       ),
       body: Column(
         children: <Widget>[
-          if (!chat.isConfigured) const ApiKeyBanner(),
+          if (!context.watch<AiSettingsStore>().isConfigured)
+            const ApiKeyBanner(),
           Expanded(
             child: history.isEmpty && !pending
                 ? _EmptyRoom(persona: persona)

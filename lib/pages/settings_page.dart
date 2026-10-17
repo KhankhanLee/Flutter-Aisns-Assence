@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:assence/pages/profile_edit_page.dart';
-import 'package:assence/state/chat_store.dart';
+import 'package:assence/pages/api_key_page.dart';
+import 'package:assence/state/ai_settings_store.dart';
 import 'package:assence/state/user_profile_store.dart';
 import 'package:assence/widgets/assence_logo.dart';
 
@@ -11,7 +12,7 @@ class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final UserProfileStore profile = context.watch<UserProfileStore>();
-    final bool aiReady = context.watch<ChatStore>().isConfigured;
+    final AiSettingsStore ai = context.watch<AiSettingsStore>();
 
     return Scaffold(
       appBar: AppBar(title: const Text('설정')),
@@ -30,15 +31,19 @@ class SettingsPage extends StatelessWidget {
           const _SectionTitle('AI'),
           ListTile(
             leading: Icon(
-              aiReady ? Icons.check_circle_outline : Icons.error_outline,
-              color: aiReady ? Colors.green : Colors.orange,
+              ai.isConfigured ? Icons.check_circle_outline : Icons.key_outlined,
+              color: ai.isConfigured ? Colors.green : Colors.orange,
             ),
-            title: const Text('Gemini 연결 상태'),
+            title: const Text('Gemini API 키'),
             subtitle: Text(
-              aiReady
-                  ? '연결됨 · AI 답글과 DM을 사용할 수 있어요'
-                  : 'API 키 미설정 · --dart-define=GEMINI_API_KEY=<키> 로 빌드해 주세요',
+              ai.isConfigured
+                  ? '연결됨 · ${ai.maskedKey} · ${ai.model}'
+                  : '미설정 · 눌러서 키를 입력하면 AI 답글·DM·게시물이 켜져요',
             ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute<void>(builder: (_) => const ApiKeyPage())),
           ),
           const _SectionTitle('정보'),
           ListTile(

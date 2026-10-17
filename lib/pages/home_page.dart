@@ -8,6 +8,7 @@ import 'package:assence/pages/profile_page.dart';
 import 'package:assence/pages/search_page.dart';
 import 'package:assence/pages/settings_page.dart';
 import 'package:assence/state/chat_store.dart';
+import 'package:assence/state/feed_store.dart';
 import 'package:assence/state/notification_store.dart';
 import 'package:assence/state/user_profile_store.dart';
 import 'package:assence/widgets/assence_logo.dart';
@@ -27,6 +28,15 @@ class _HomePageState extends State<HomePage> {
   static const int profileTab = 4;
 
   int _currentIndex = feedTab;
+
+  @override
+  void initState() {
+    super.initState();
+    // 앱을 열면, 마지막 AI 게시물이 오래됐을 때 AI 친구가 새 게시물을 올린다.
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => context.read<FeedStore>().maybeAutoPost(),
+    );
+  }
 
   void _select(int index) {
     // 알림 탭을 보고 나갈 때 읽음 처리한다. 보는 동안은 새 알림이 강조된 채로 남는다.

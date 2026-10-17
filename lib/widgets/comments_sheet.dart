@@ -31,15 +31,23 @@ List<Comment> threadedComments(List<Comment> comments) {
   ];
 }
 
-class CommentsSheet extends StatelessWidget {
+class CommentsSheet extends StatefulWidget {
   final String postId;
 
   const CommentsSheet({super.key, required this.postId});
 
   @override
+  State<CommentsSheet> createState() => _CommentsSheetState();
+}
+
+class _CommentsSheetState extends State<CommentsSheet> {
+  /// 답글을 달 대상 댓글. null이면 새 댓글.
+  Comment? _replyTo;
+
+  @override
   Widget build(BuildContext context) {
     final FeedStore feed = context.watch<FeedStore>();
-    final Post? post = feed.byId(postId);
+    final Post? post = feed.byId(widget.postId);
     if (post == null) return const SizedBox.shrink();
     final List<Comment> comments = threadedComments(post.comments);
 
@@ -61,8 +69,10 @@ class CommentsSheet extends StatelessWidget {
               : ListView.builder(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   itemCount: comments.length,
-                  itemBuilder: (BuildContext context, int index) =>
-                      CommentTile(comment: comments[index]),
+                  itemBuilder: (BuildContext context, int index) => CommentTile(
+                    comment: comments[index],
+                    onReply: (Comment c) => setState(() => _replyTo = c),
+                  ),
                 ),
         ),
         const Divider(height: 1),
@@ -70,7 +80,12 @@ class CommentsSheet extends StatelessWidget {
           padding: EdgeInsets.only(
             bottom: MediaQuery.viewInsetsOf(context).bottom,
           ),
-          child: CommentInput(postId: postId, autofocus: true),
+          child: CommentInput(
+            postId: widget.postId,
+            autofocus: true,
+            replyTo: _replyTo,
+            onReplyDone: () => setState(() => _replyTo = null),
+          ),
         ),
       ],
     );
@@ -81,7 +96,15 @@ class CommentTile extends StatelessWidget {
   final Comment comment;
   final bool compact;
 
-  const CommentTile({super.key, required this.comment, this.compact = false});
+  /// '답글 달기'를 눌렀을 때. null이면 버튼을 숨긴다.
+  final ValueChanged<Comment>? onReply;
+
+  const CommentTile({
+    super.key,
+    required this.comment,
+    this.compact = false,
+    this.onReply,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -123,9 +146,27 @@ class CommentTile extends StatelessWidget {
               children: <Widget>[
                 body,
                 const SizedBox(height: 2),
-                Text(
-                  formatTimeAgo(comment.createdAt),
-                  style: const TextStyle(color: Colors.grey, fontSize: 11),
+                Row(
+                  children: <Widget>[
+                    Text(
+                      formatTimeAgo(comment.createdAt),
+                      style: const TextStyle(color: Colors.grey, fontSize: 11),
+                    ),
+                    if (onReply != null) ...<Widget>[
+                      const SizedBox(width: 12),
+                      GestureDetector(
+                        onTap: () => onReply!(comment),
+                        child: const Text(
+                          '답글 달기',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 if (feed.isReplyPending(comment.id))
                   const Padding(
@@ -166,7 +207,17 @@ class CommentInput extends StatefulWidget {
   final String postId;
   final bool autofocus;
 
-  const CommentInput({super.key, required this.postId, this.autofocus = false});
+  /// 답글을 달 대상. 있으면 입력창 위에 표시하고, 보내면 그 스레드에 붙는다.
+  final Comment? replyTo;
+  final VoidCallback? onReplyDone;
+
+  const CommentInput({
+    super.key,
+    required this.postId,
+    this.autofocus = false,
+    this.replyTo,
+    this.onReplyDone,
+  });
 
   @override
   State<CommentInput> createState() => _CommentInputState();
@@ -174,6 +225,7 @@ class CommentInput extends StatefulWidget {
 
 class _CommentInputState extends State<CommentInput> {
   final TextEditingController _controller = TextEditingController();
+  final FocusNode _focus = FocusNode();
 
   @override
   void initState() {
@@ -182,8 +234,18 @@ class _CommentInputState extends State<CommentInput> {
   }
 
   @override
+  void didUpdateWidget(CommentInput oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 답글 대상을 고르면 바로 입력할 수 있게 포커스를 준다.
+    if (widget.replyTo != null && widget.replyTo != oldWidget.replyTo) {
+      _focus.requestFocus();
+    }
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
+    _focus.dispose();
     super.dispose();
   }
 
@@ -191,38 +253,74 @@ class _CommentInputState extends State<CommentInput> {
     final String text = _controller.text;
     if (text.trim().isEmpty) return;
     _controller.clear();
-    context.read<FeedStore>().addComment(widget.postId, text);
+    context.read<FeedStore>().addComment(
+      widget.postId,
+      text,
+      replyToId: widget.replyTo?.id,
+    );
+    widget.onReplyDone?.call();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 4, 4),
-      child: Row(
-        children: <Widget>[
-          const AuthorAvatar(authorId: 'me', radius: 14),
-          const SizedBox(width: 10),
-          Expanded(
-            child: TextField(
-              controller: _controller,
-              autofocus: widget.autofocus,
-              textInputAction: TextInputAction.send,
-              onSubmitted: (_) => _submit(),
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                hintText: '댓글 달기...',
-                hintStyle: TextStyle(fontSize: 13, color: Colors.grey),
-                isDense: true,
-                contentPadding: EdgeInsets.symmetric(vertical: 6),
-              ),
+    final Comment? replyTo = widget.replyTo;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        if (replyTo != null)
+          Container(
+            color: Colors.grey[100],
+            padding: const EdgeInsets.fromLTRB(16, 6, 4, 6),
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    '${authorHandle(context, replyTo.authorId)}님에게 답글 남기는 중',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 18),
+                  tooltip: '답글 취소',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: widget.onReplyDone,
+                ),
+              ],
             ),
           ),
-          TextButton(
-            onPressed: _controller.text.trim().isEmpty ? null : _submit,
-            child: const Text('게시'),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 4, 4),
+          child: Row(
+            children: <Widget>[
+              const AuthorAvatar(authorId: 'me', radius: 14),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextField(
+                  controller: _controller,
+                  focusNode: _focus,
+                  autofocus: widget.autofocus,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) => _submit(),
+                  decoration: InputDecoration(
+                    border: InputBorder.none,
+                    hintText: replyTo == null ? '댓글 달기...' : '답글 달기...',
+                    hintStyle: const TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey,
+                    ),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 6),
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: _controller.text.trim().isEmpty ? null : _submit,
+                child: const Text('게시'),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

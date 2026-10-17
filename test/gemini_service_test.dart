@@ -156,7 +156,12 @@ void main() {
     final String reply = await service.generateCommentReply(
       persona: seedPersonas.first,
       post: buildSeedPosts(DateTime(2026)).first,
-      commentText: '라떼 맛있어 보여요',
+      thread: <CommentLine>[
+        (author: '사용자', text: '라떼 맛있어 보여요'),
+        (author: '하연', text: '고마워요 ☕️'),
+        (author: '사용자', text: '어디 카페예요?'),
+      ],
+      isOwnPost: true,
     );
 
     expect(reply, '고마워요!');
@@ -165,6 +170,113 @@ void main() {
     expect(systemText, startsWith(seedPersonas.first.prompt));
     final String userText = body['contents'][0]['parts'][0]['text'] as String;
     expect(userText, contains('라떼 맛있어 보여요'));
+    // 스레드 전체가 순서대로 들어가야 AI가 대화를 이어갈 수 있다.
+    expect(
+      userText.indexOf('사용자: 라떼'),
+      lessThan(userText.indexOf('사용자: 어디 카페예요?')),
+    );
+    expect(userText, contains('하연: 고마워요'));
     expect(userText, contains('#감성카페'));
+  });
+
+  group('모델 자동 선택', () {
+    test('최신 일반 Flash를 정식 버전 우선으로 고른다', () {
+      expect(
+        GeminiService.pickChatModel(<String>[
+          'gemini-2.5-flash',
+          'gemini-3.8-flash',
+          'gemini-3.9-flash-preview-11-2026',
+          'gemini-3.5-flash-lite',
+          'gemini-3.8-flash-image',
+          'gemini-3.1-pro-preview',
+          'text-embedding-004',
+        ]),
+        'gemini-3.8-flash',
+      );
+      // Flash가 없으면 Flash-Lite, 그것도 없으면 다른 Gemini
+      expect(
+        GeminiService.pickChatModel(<String>[
+          'gemini-3.5-flash-lite',
+          'gemini-3.1-pro',
+        ]),
+        'gemini-3.5-flash-lite',
+      );
+      expect(
+        GeminiService.pickChatModel(<String>['gemini-3.1-pro']),
+        'gemini-3.1-pro',
+      );
+      expect(GeminiService.pickChatModel(<String>['embedding-001']), isNull);
+    });
+
+    test('모델이 없어졌으면 쓸 수 있는 모델을 찾아 한 번 더 시도한다', () async {
+      final List<String> calls = <String>[];
+      String? changed;
+      final GeminiService service = GeminiService(
+        apiKey: 'k',
+        model: 'gemini-2.5-flash',
+        client: MockClient((http.Request request) async {
+          calls.add('${request.method} ${request.url.path}');
+          if (request.method == 'GET') {
+            return _okResponse(
+              jsonEncode(<String, dynamic>{
+                'models': <dynamic>[
+                  <String, dynamic>{
+                    'name': 'models/gemini-3.8-flash',
+                    'supportedGenerationMethods': <String>['generateContent'],
+                  },
+                  <String, dynamic>{
+                    'name': 'models/text-embedding-004',
+                    'supportedGenerationMethods': <String>['embedContent'],
+                  },
+                ],
+              }),
+            );
+          }
+          if (request.url.path.contains('gemini-2.5-flash')) {
+            return http.Response(
+              '{"error":{"message":"This model is no longer available."}}',
+              404,
+            );
+          }
+          return _okResponse(_candidateBody(<String>['안녕!']));
+        }),
+      )..onModelChanged = (String m) => changed = m;
+
+      final String reply = await service.generateReply(
+        persona: 'p',
+        history: history,
+      );
+
+      expect(reply, '안녕!');
+      expect(service.model, 'gemini-3.8-flash');
+      expect(changed, 'gemini-3.8-flash');
+      expect(calls, <String>[
+        'POST /v1beta/models/gemini-2.5-flash:generateContent',
+        'GET /v1beta/models',
+        'POST /v1beta/models/gemini-3.8-flash:generateContent',
+      ]);
+    });
+
+    test('잘못된 키는 invalidApiKey로 구분한다', () async {
+      final GeminiService service = GeminiService(
+        apiKey: 'bad',
+        client: MockClient(
+          (_) async => http.Response(
+            '{"error":{"status":"INVALID_ARGUMENT","details":[{"reason":"API_KEY_INVALID"}]}}',
+            400,
+          ),
+        ),
+      );
+      await expectLater(
+        service.generateReply(persona: 'p', history: history),
+        throwsA(
+          isA<GeminiException>().having(
+            (GeminiException e) => e.kind,
+            'kind',
+            GeminiErrorKind.invalidApiKey,
+          ),
+        ),
+      );
+    });
   });
 }

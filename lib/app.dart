@@ -4,6 +4,7 @@ import 'package:assence/pages/home_page.dart';
 import 'package:assence/pages/splash_page.dart';
 import 'package:assence/services/gemini_service.dart';
 import 'package:assence/services/local_store.dart';
+import 'package:assence/state/ai_settings_store.dart';
 import 'package:assence/state/chat_store.dart';
 import 'package:assence/state/feed_store.dart';
 import 'package:assence/state/notification_store.dart';
@@ -19,6 +20,7 @@ class AppStores {
   final FeedStore feed;
   final StoryStore stories;
   final UserProfileStore profile;
+  final AiSettingsStore ai;
 
   AppStores._(
     this.personas,
@@ -27,9 +29,12 @@ class AppStores {
     this.feed,
     this.stories,
     this.profile,
+    this.ai,
   );
 
   factory AppStores.create(LocalStore local, GeminiService gemini) {
+    // 앱에 저장된 API 키·모델을 먼저 적용해야 다른 스토어가 바로 쓸 수 있다.
+    final AiSettingsStore ai = AiSettingsStore(local, gemini);
     final PersonaStore personas = PersonaStore(local);
     final NotificationStore notifications = NotificationStore(local);
     return AppStores._(
@@ -39,6 +44,7 @@ class AppStores {
       FeedStore(local, gemini, personas, notifications),
       StoryStore(local),
       UserProfileStore(local),
+      ai,
     );
   }
 }
@@ -63,6 +69,7 @@ class AssenceApp extends StatelessWidget {
         ChangeNotifierProvider<FeedStore>.value(value: stores.feed),
         ChangeNotifierProvider<StoryStore>.value(value: stores.stories),
         ChangeNotifierProvider<UserProfileStore>.value(value: stores.profile),
+        ChangeNotifierProvider<AiSettingsStore>.value(value: stores.ai),
       ],
       child: MaterialApp(
         title: 'Assence',
