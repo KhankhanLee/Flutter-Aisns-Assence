@@ -9,9 +9,11 @@ import 'package:assence/pages/notifications_page.dart';
 import 'package:assence/pages/profile_page.dart';
 import 'package:assence/pages/search_page.dart';
 import 'package:assence/pages/settings_page.dart';
+import 'package:assence/state/ai_settings_store.dart';
 import 'package:assence/state/chat_store.dart';
 import 'package:assence/state/feed_store.dart';
 import 'package:assence/state/notification_store.dart';
+import 'package:assence/state/story_store.dart';
 import 'package:assence/state/user_profile_store.dart';
 import 'package:assence/widgets/assence_logo.dart';
 
@@ -32,6 +34,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   int _currentIndex = feedTab;
 
   Timer? _scheduleTimer;
+  bool _sendingStoryReplies = false;
 
   @override
   void initState() {
@@ -59,7 +62,30 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   void _checkSchedule() {
-    if (mounted) context.read<FeedStore>().runScheduledPosts();
+    if (!mounted) return;
+    context.read<FeedStore>().runScheduledPosts();
+    _sendStoryReplies();
+  }
+
+  /// 내 스토리를 본 AI 친구 중 DM을 보낼 차례가 된 친구가 보낸다.
+  /// 실패하면(한도 등) 다음 확인 때 다시 시도한다.
+  Future<void> _sendStoryReplies() async {
+    final StoryStore stories = context.read<StoryStore>();
+    final ChatStore chat = context.read<ChatStore>();
+    if (_sendingStoryReplies || !context.read<AiSettingsStore>().isConfigured) {
+      return;
+    }
+    _sendingStoryReplies = true;
+    try {
+      for (final DueStoryReply due in stories.dueReplies()) {
+        if (!await chat.receiveStoryReaction(due.view.personaId, due.story)) {
+          return;
+        }
+        stories.markReplied(due.view);
+      }
+    } finally {
+      _sendingStoryReplies = false;
+    }
   }
 
   void _select(int index) {

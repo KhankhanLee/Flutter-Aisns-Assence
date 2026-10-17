@@ -44,11 +44,14 @@ class SettingsPage extends StatelessWidget {
               ai.isConfigured ? Icons.check_circle_outline : Icons.key_outlined,
               color: ai.isConfigured ? Colors.green : Colors.orange,
             ),
-            title: const Text('Gemini API 키'),
+            title: const Text('AI 연결 (Gemini / Claude)'),
             subtitle: Text(
-              ai.isConfigured
-                  ? '연결됨 · ${ai.maskedKey} · ${ai.model}'
-                  : '미설정 · 눌러서 키를 입력하면 AI 답글·DM·게시물이 켜져요',
+              !ai.isConfigured
+                  ? '미설정 · 눌러서 키를 입력하면 AI 답글·DM·게시물이 켜져요'
+                  : ai.fallbackModel != null
+                  ? '${_providerName(ai.provider)} 연결됨 · 기본 모델 사용량 초과로 '
+                        '${ai.fallbackModel} 사용 중'
+                  : '${_providerName(ai.provider)} 연결됨 · ${ai.maskedKey} · ${ai.model}',
             ),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(
@@ -60,10 +63,11 @@ class SettingsPage extends StatelessWidget {
             title: const Text('AI 친구가 사진도 직접 만들기'),
             subtitle: const Text(
               '새 게시물마다 Gemini로 프로필 속 인물의 새 사진을 만들어요. '
-              '이미지 모델은 유료일 수 있어요. 끄거나 실패하면 기존 사진 중에서 골라요.',
+              'Gemini 키가 있어야 하고, 이미지 모델은 유료일 수 있어요. '
+              '끄거나 실패하면 기존 사진 중에서 골라요.',
             ),
             value: ai.imageGeneration,
-            onChanged: ai.isConfigured
+            onChanged: ai.hasKey(AiProvider.gemini)
                 ? (bool value) => ai.imageGeneration = value
                 : null,
           ),
@@ -139,3 +143,8 @@ class _SectionTitle extends StatelessWidget {
     );
   }
 }
+
+String _providerName(AiProvider provider) => switch (provider) {
+  AiProvider.gemini => 'Gemini',
+  AiProvider.claude => 'Claude',
+};

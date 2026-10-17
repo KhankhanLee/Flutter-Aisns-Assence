@@ -9,6 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 class FakeGemini extends GeminiService {
   final List<List<ChatMessage>> requests = <List<ChatMessage>>[];
   final List<String> personas = <String>[];
+  final List<ChatImage?> images = <ChatImage?>[];
+  final List<bool> backgrounds = <bool>[];
   String reply;
   GeminiException? error;
 
@@ -22,9 +24,13 @@ class FakeGemini extends GeminiService {
   Future<String> generateReply({
     required String persona,
     required List<ChatMessage> history,
+    ChatImage? image,
+    bool background = false,
   }) async {
     personas.add(persona);
     requests.add(List<ChatMessage>.of(history));
+    images.add(image);
+    backgrounds.add(background);
     if (!isConfigured) {
       throw const GeminiException(GeminiErrorKind.missingApiKey, 'no key');
     }
