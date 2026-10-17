@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 import 'package:assence/models/chat_message.dart';
 import 'package:assence/models/persona.dart';
 import 'package:assence/navigation.dart';
+import 'package:assence/state/ai_settings_store.dart';
 import 'package:assence/state/chat_store.dart';
 import 'package:assence/state/persona_store.dart';
 import 'package:assence/widgets/api_key_banner.dart';
+import 'package:assence/utils/humanize.dart';
 import 'package:assence/widgets/author_avatar.dart';
 
 /// 페르소나 한 명과의 DM 대화방.
@@ -126,7 +128,8 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
       ),
       body: Column(
         children: <Widget>[
-          if (!chat.isConfigured) const ApiKeyBanner(),
+          if (!context.watch<AiSettingsStore>().isConfigured)
+            const ApiKeyBanner(),
           Expanded(
             child: history.isEmpty && !pending
                 ? _EmptyRoom(persona: persona)
@@ -147,7 +150,10 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                       }
                       final ChatMessage message = history[index];
                       return _Bubble(
-                        text: message.text,
+                        // 예전에 저장된 긴 답장도 마크다운 기호 없이 보여준다.
+                        text: message.isUser
+                            ? message.text
+                            : humanizeReply(message.text, maxEmoji: 99),
                         isUser: message.isUser,
                         personaId: persona.id,
                       );

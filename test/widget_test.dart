@@ -343,4 +343,54 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('키가 없을 때 배너를 누르면 API 키 입력 화면이 열린다', (WidgetTester tester) async {
+    final AppStores stores = await createTestStores(
+      FakeGemini(configured: false),
+    );
+    await tester.pumpWidget(AssenceApp(stores: stores, showSplash: false));
+    await tester.pump();
+
+    await tester.tap(find.textContaining('API 키를 입력하세요'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('키가 아직 없어요'), findsOneWidget);
+    expect(find.text('https://aistudio.google.com/apikey'), findsOneWidget);
+    final FilledButton save = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, '저장하고 연결 테스트'),
+    );
+    expect(save.onPressed, isNull);
+  });
+
+  testWidgets('댓글 창에서 AI 답글에 답글을 달면 AI가 이어서 답한다', (WidgetTester tester) async {
+    final FakeGemini gemini = FakeGemini(reply: '창가 자리 최고죠');
+    final AppStores stores = await createTestStores(gemini);
+    await stores.feed.addComment('seed_hayeon_cafe', '분위기 좋아요');
+    await tester.pumpWidget(AssenceApp(stores: stores, showSplash: false));
+    await tester.pump();
+
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -700));
+    await tester.pump();
+    await tester.tap(find.byTooltip('댓글').hitTestable().first);
+    await tester.pumpAndSettle();
+    // AI 답글(두 번째 댓글)의 '답글 달기'
+    await tester.tap(find.text('답글 달기').last);
+    await tester.pump();
+    expect(find.text('hayeon_daily님에게 답글 남기는 중'), findsOneWidget);
+
+    gemini.reply = '다음에 같이 가요!';
+    await tester.enterText(find.widgetWithText(TextField, '답글 달기...'), '어디예요?');
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await tester.pumpAndSettle();
+
+    expect(find.text('hayeon_daily님에게 답글 남기는 중'), findsNothing);
+    expect(find.textContaining('다음에 같이 가요!', findRichText: true), findsWidgets);
+    final List<String> parents = stores.feed
+        .byId('seed_hayeon_cafe')!
+        .comments
+        .skip(1)
+        .map((c) => c.parentId!)
+        .toList();
+    expect(parents.toSet(), hasLength(1));
+  });
 }

@@ -123,7 +123,12 @@ class PostCard extends StatelessWidget {
           ),
         if (preview.isNotEmpty) const SizedBox(height: 4),
         for (final Comment comment in preview)
-          CommentTile(comment: comment, compact: true),
+          // 미리보기 댓글을 누르면 댓글 창이 열려 답글을 달 수 있다.
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => showCommentsSheet(context, post.id),
+            child: CommentTile(comment: comment, compact: true),
+          ),
         if (post.comments.any((Comment c) => feed.isReplyPending(c.id)))
           Padding(
             padding: const EdgeInsets.fromLTRB(32, 2, 16, 0),

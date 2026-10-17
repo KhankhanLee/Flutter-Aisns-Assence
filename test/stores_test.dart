@@ -1,3 +1,9 @@
+import 'dart:convert';
+
+import 'package:assence/data/seed_data.dart';
+import 'package:assence/state/ai_settings_store.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:assence/app.dart';
 import 'package:assence/models/app_notification.dart';
 import 'package:assence/models/chat_message.dart';
@@ -157,7 +163,11 @@ void main() {
         stores.chat.historyOf('hayeon').map((ChatMessage m) => m.role),
         <String>['user', 'model'],
       );
-      expect(gemini.personas.single, stores.personas.byId('hayeon')!.prompt);
+      // 캐릭터 프로필 뒤에 공통 말투 규칙과 DM 상황 설명이 붙는다.
+      final String system = gemini.personas.single;
+      expect(system, startsWith(stores.personas.byId('hayeon')!.prompt));
+      expect(system, contains('[말투 규칙]'));
+      expect(system, contains('DM'));
       expect(stores.chat.historyOf('suyeon'), isEmpty);
     });
 
@@ -258,6 +268,184 @@ void main() {
       expect(reopened.handle, 'new_me');
       expect(reopened.name, UserProfileStore.defaultName);
       expect(reopened.bio, '안녕');
+    });
+  });
+
+  group('AI 상호작용', () {
+    test('내 게시물의 AI 댓글에 답글을 달면 그 AI가 스레드로 이어서 답한다', () async {
+      final FakeGemini gemini = FakeGemini(reply: '사진 너무 예뻐요!');
+      final AppStores stores = await createTestStores(gemini);
+      await stores.feed.addPost(imagePath: '/tmp/me.jpg', caption: '여행 사진');
+      final Post mine = stores.feed.posts.first;
+      final Comment aiComment = mine.comments.first;
+      // 내 게시물에 내가 단 일반 댓글에는 아무도 답하지 않는다.
+      await stores.feed.addComment(mine.id, '혼잣말');
+      expect(mine.comments.last.authorId, myUserId);
+
+      gemini.reply = '제주도 맞죠?';
+      await stores.feed.addComment(mine.id, '고마워요!', replyToId: aiComment.id);
+
+      final Comment myReply = mine.comments[mine.comments.length - 2];
+      final Comment aiReply = mine.comments.last;
+      expect(myReply.parentId, aiComment.id);
+      expect(aiReply.authorId, aiComment.authorId);
+      expect(aiReply.parentId, aiComment.id);
+      expect(aiReply.replyToId, myReply.id);
+      expect(aiReply.text, '제주도 맞죠?');
+      // 스레드 맥락(AI의 첫 댓글 → 내 답글)이 프롬프트에 들어간다.
+      final String prompt = gemini.requests.last.single.text;
+      expect(prompt, contains('사진 너무 예뻐요!'));
+      expect(prompt, contains('사용자: 고마워요!'));
+      expect(prompt, contains('친구가 올린'));
+    });
+
+    test('페르소나 답글에 다시 답하면 대화가 같은 스레드로 이어진다', () async {
+      final FakeGemini gemini = FakeGemini(reply: '첫 답글');
+      final AppStores stores = await createTestStores(gemini);
+      final Post post = stores.feed.byId('seed_hayeon_cafe')!;
+
+      await stores.feed.addComment(post.id, '어디예요?');
+      final Comment firstReply = post.comments.last;
+      gemini.reply = '두 번째 답글';
+      await stores.feed.addComment(
+        post.id,
+        '가보고 싶어요',
+        replyToId: firstReply.id,
+      );
+
+      final Comment root = post.comments.first;
+      expect(
+        post.comments.skip(1).map((Comment c) => c.parentId),
+        everyElement(root.id),
+      );
+      expect(post.comments.last.text, '두 번째 답글');
+      expect(post.comments.last.authorId, 'hayeon');
+      final String prompt = gemini.requests.last.single.text;
+      expect(prompt, contains('하연: 첫 답글'));
+      expect(prompt, contains('네가 올린'));
+    });
+
+    test('페르소나가 사진을 골라 캡션을 쓰고 새 게시물을 올린다', () async {
+      final FakeGemini gemini = FakeGemini(reply: '오늘의 기록 #일상');
+      final AppStores stores = await createTestStores(gemini);
+      final String lastAuthor = stores.feed.posts.first.authorId;
+
+      final Post? post = await stores.feed.createPersonaPost();
+
+      expect(post, isNotNull);
+      expect(stores.feed.posts.first, same(post));
+      expect(post!.authorId, isNot(lastAuthor));
+      expect(post.caption, '오늘의 기록 #일상');
+      expect(
+        personaPhotos[post.authorId]!.map((PersonaPhoto p) => p.path),
+        contains(post.imagePath),
+      );
+      expect(stores.notifications.items.first.type, NotificationType.newPost);
+      expect(stores.feed.isCreatingPost, isFalse);
+    });
+  });
+
+  group('AiSettingsStore', () {
+    GeminiService service(Future<http.Response> Function(http.Request) h) =>
+        GeminiService(apiKey: '', client: MockClient(h));
+
+    Future<http.Response> fakeApi(http.Request request) async {
+      if (request.headers['x-goog-api-key'] != 'good-key') {
+        return http.Response('{"error":{"message":"API key not valid"}}', 400);
+      }
+      if (request.method == 'GET') {
+        return http.Response.bytes(
+          utf8.encode(
+            jsonEncode(<String, dynamic>{
+              'models': <dynamic>[
+                <String, dynamic>{
+                  'name': 'models/gemini-3.8-flash',
+                  'supportedGenerationMethods': <String>['generateContent'],
+                },
+              ],
+            }),
+          ),
+          200,
+        );
+      }
+      return http.Response.bytes(
+        utf8.encode(
+          '{"candidates":[{"content":{"parts":[{"text":"안녕하세요!"}]}}]}',
+        ),
+        200,
+      );
+    }
+
+    test('키를 저장하면 모델을 찾고 응답을 확인한 뒤 다시 열어도 유지된다', () async {
+      final LocalStore local = await openTestStore();
+      final GeminiService gemini = service(fakeApi);
+      final AiSettingsStore ai = AiSettingsStore(local, gemini);
+      expect(ai.isConfigured, isFalse);
+
+      final String reply = await ai.saveAndTest('  good-key  ');
+      expect(reply, '안녕하세요!');
+      expect(ai.isConfigured, isTrue);
+      expect(ai.model, 'gemini-3.8-flash');
+      expect(ai.maskedKey, isNot(contains('good-key')));
+
+      final GeminiService reopened = service(fakeApi);
+      AiSettingsStore(local, reopened);
+      expect(reopened.apiKey, 'good-key');
+      expect(reopened.model, 'gemini-3.8-flash');
+
+      await ai.clearKey();
+      expect(ai.isConfigured, isFalse);
+    });
+
+    test('잘못된 키는 저장하지 않고 이전 상태로 되돌린다', () async {
+      final LocalStore local = await openTestStore();
+      final GeminiService gemini = service(fakeApi);
+      final AiSettingsStore ai = AiSettingsStore(local, gemini);
+
+      await expectLater(
+        ai.saveAndTest('bad-key'),
+        throwsA(
+          isA<GeminiException>().having(
+            (GeminiException e) => e.kind,
+            'kind',
+            GeminiErrorKind.invalidApiKey,
+          ),
+        ),
+      );
+      expect(ai.isConfigured, isFalse);
+      expect(ai.isTesting, isFalse);
+      final GeminiService reopened = service(fakeApi);
+      AiSettingsStore(local, reopened);
+      expect(reopened.apiKey, isEmpty);
+    });
+  });
+
+  group('사람 같은 DM', () {
+    test('빈 줄로 나뉜 답장은 말풍선 여러 개로 저장되고, 다음 요청에서는 합쳐진다', () async {
+      final FakeGemini gemini = FakeGemini(
+        reply: '**아 그거?**\n\n나 요즘 그거 진짜 빠졌잖아\n\n너는 요즘 뭐 해?',
+      );
+      final AppStores stores = await createTestStores(gemini);
+      stores.chat.bubbleGap = () => Duration.zero;
+
+      await stores.chat.send('jieun', '요즘 관심사가 뭔데?');
+
+      expect(
+        stores.chat.historyOf('jieun').map((ChatMessage m) => m.text),
+        <String>['요즘 관심사가 뭔데?', '아 그거?', '나 요즘 그거 진짜 빠졌잖아', '너는 요즘 뭐 해?'],
+      );
+
+      gemini.reply = 'ㅋㅋ';
+      await stores.chat.send('jieun', '나는 그냥 집');
+      // 저장된 말풍선이 그대로 서비스에 넘어간다 (합치기는 GeminiService가 한다).
+      final List<ChatMessage> sent = gemini.requests.last;
+      expect(sent.map((ChatMessage m) => m.role), <String>[
+        'user',
+        'model',
+        'model',
+        'model',
+        'user',
+      ]);
     });
   });
 }

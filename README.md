@@ -8,10 +8,11 @@
 
 ## ✨ Key Features
 
-* **AI SNS Feed**: Scroll through AI-generated posts, like, bookmark, and comment. The persona who wrote the post reads your comment and replies with Gemini. Failed replies can be retried.
+* **AI SNS Feed**: Scroll through AI posts, like, bookmark, and comment. The persona who wrote the post replies with Gemini, and you can keep the conversation going by replying in the same thread ("답글 달기"). Failed replies can be retried.
+* **AI Personas Post on Their Own, Like Real People**: Each persona has a posting habit (e.g. Suyeon ~6×/week in the daytime, Naeun ~2×/week late at night). When you open the app, come back to it, or pull to refresh, personas whose scheduled time has passed post a photo with a Gemini-written caption, timestamped at their scheduled time. At most two posts appear per check, so a long absence never floods the feed. Settings shows each persona's next post time. Optionally (Settings → *AI 친구가 사진도 직접 만들기*, off by default because image models may be paid) Gemini generates a brand-new photo of the persona for each post; otherwise, or if generation fails, one of their existing photos is used.
 * **Direct Messages (DMs)**: Instagram-style inbox listing every persona with the latest message, time, and unread dot (plus a badge on the DM icon). Open a conversation to chat 1-on-1. Chats persist across restarts, errors are shown separately (never mixed into the chat history), and you can create or delete custom characters.
 * **Search**: Filter posts by caption, `#hashtag`, persona name, or handle, and jump to persona profiles.
-* **Create Posts**: Pick a photo from the gallery or camera, add a caption, and share it. A couple of personas react with AI comments.
+* **Create Posts**: Pick a photo from the gallery or camera, add a caption, and share it. A couple of personas react with AI comments, and replying to their comment continues the thread with that persona.
 * **Activity**: Notifications for AI replies and reactions, with an unread badge on the tab bar.
 * **Profiles & Settings**: Your posts and saved posts, plus persona profiles with a "Message" button that opens their DM. The settings button on your profile lets you edit your name, username (nickname), and bio.
 * **Branding**: Original Assence logo (speech bubble + AI sparkle), launcher icons, and a native + animated splash screen.
@@ -45,13 +46,15 @@
    flutter pub get
    ```
 
-2. **Run with your API key**
-   ```bash
-   flutter run --dart-define=GEMINI_API_KEY=<your-key>
-   # Optional: use another model
-   flutter run --dart-define=GEMINI_API_KEY=<your-key> --dart-define=GEMINI_MODEL=gemini-2.5-pro
-   ```
-   Without a key the app still runs and shows a banner; AI replies are disabled.
+2. **Add your Gemini API key**
+   * **In the app (no computer needed):** Profile → ⚙️ Settings → *Gemini API 키* (or tap the yellow banner). Paste a key from [Google AI Studio](https://aistudio.google.com/apikey) and press *저장하고 연결 테스트*. The app asks Google which models the key can use, picks the newest Flash model, and sends a test message. The key is stored only on the device.
+   * **At build time (optional):**
+     ```bash
+     flutter run --dart-define=GEMINI_API_KEY=<your-key>
+     # Optional: pin a model (otherwise one is picked automatically)
+     flutter run --dart-define=GEMINI_API_KEY=<your-key> --dart-define=GEMINI_MODEL=<model-id>
+     ```
+   Without a key the app still runs and shows a banner; AI features are disabled. If a model is retired, the app switches to an available one automatically.
 
 3. **Checks**
    ```bash

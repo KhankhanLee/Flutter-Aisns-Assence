@@ -1,4 +1,4 @@
-enum NotificationType { commentReply, postReaction }
+enum NotificationType { commentReply, postReaction, newPost }
 
 class AppNotification {
   final String id;

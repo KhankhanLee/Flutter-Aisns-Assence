@@ -1,9 +1,12 @@
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:assence/models/chat_message.dart';
 import 'package:assence/models/persona.dart';
 import 'package:assence/services/gemini_service.dart';
 import 'package:assence/services/local_store.dart';
 import 'package:assence/state/persona_store.dart';
+import 'package:assence/utils/humanize.dart';
 
 /// 페르소나별 DM 기록. 각 페르소나가 독립된 대화 노드처럼 자기 history를 가진다.
 class ChatStore extends ChangeNotifier {
@@ -19,6 +22,10 @@ class ChatStore extends ChangeNotifier {
   final Set<String> _pending = <String>{};
   final Map<String, String> _errors = <String, String>{};
   final Map<String, DateTime> _lastReadAt = <String, DateTime>{};
+
+  /// 나눠 보내는 말풍선 사이의 간격. 테스트에서는 0으로 바꾼다.
+  Duration Function() bubbleGap = () =>
+      Duration(milliseconds: 600 + Random().nextInt(600));
 
   ChatStore(this._local, this._gemini, this._personas) {
     final Object? lastRead = _local.readJson(_lastReadKey);
@@ -36,8 +43,6 @@ class ChatStore extends ChangeNotifier {
       });
     }
   }
-
-  bool get isConfigured => _gemini.isConfigured;
 
   List<ChatMessage> historyOf(String personaId) =>
       List<ChatMessage>.unmodifiable(_histories[personaId] ?? <ChatMessage>[]);
@@ -112,14 +117,22 @@ class ChatStore extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final String reply = await _gemini.generateReply(
-        persona: persona.prompt,
+      final String reply = await _gemini.generateChatReply(
+        persona: persona,
         history: historyOf(personaId),
       );
-      // 기다리는 동안 대화가 삭제됐으면 답장을 버린다.
-      _histories[personaId]?.add(
-        ChatMessage(role: ChatMessage.modelRole, text: reply),
-      );
+      // 사람처럼 짧은 말풍선 여러 개로 나눠, 조금씩 간격을 두고 도착하게 한다.
+      final List<String> bubbles = splitIntoBubbles(reply);
+      for (int i = 0; i < bubbles.length; i++) {
+        if (i > 0) {
+          notifyListeners();
+          await Future<void>.delayed(bubbleGap());
+        }
+        // 기다리는 동안 대화가 삭제됐으면 답장을 버린다.
+        final List<ChatMessage>? history = _histories[personaId];
+        if (history == null) break;
+        history.add(ChatMessage(role: ChatMessage.modelRole, text: bubbles[i]));
+      }
     } on GeminiException catch (e) {
       _errors[personaId] = e.userMessage;
     } finally {

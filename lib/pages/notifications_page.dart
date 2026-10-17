@@ -34,6 +34,7 @@ class NotificationsPage extends StatelessWidget {
         final String action = switch (n.type) {
           NotificationType.commentReply => '님이 회원님의 댓글에 답글을 남겼어요',
           NotificationType.postReaction => '님이 회원님의 게시물에 댓글을 남겼어요',
+          NotificationType.newPost => '님이 새 게시물을 올렸어요',
         };
         return ListTile(
           tileColor: n.read ? null : Colors.blue[50],

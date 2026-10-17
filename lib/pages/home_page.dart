@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:assence/navigation.dart';
@@ -8,6 +10,7 @@ import 'package:assence/pages/profile_page.dart';
 import 'package:assence/pages/search_page.dart';
 import 'package:assence/pages/settings_page.dart';
 import 'package:assence/state/chat_store.dart';
+import 'package:assence/state/feed_store.dart';
 import 'package:assence/state/notification_store.dart';
 import 'package:assence/state/user_profile_store.dart';
 import 'package:assence/widgets/assence_logo.dart';
@@ -19,7 +22,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   static const int feedTab = 0;
   static const int searchTab = 1;
   static const int composeTab = 2;
@@ -27,6 +30,37 @@ class _HomePageState extends State<HomePage> {
   static const int profileTab = 4;
 
   int _currentIndex = feedTab;
+
+  Timer? _scheduleTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // AI 친구는 각자 게시 일정이 있다. 앱을 열 때, 다시 돌아올 때, 켜 둔 동안
+    // 15분마다 예정 시각이 지난 친구가 있는지 확인한다.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkSchedule());
+    _scheduleTimer = Timer.periodic(
+      const Duration(minutes: 15),
+      (_) => _checkSchedule(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _scheduleTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _checkSchedule();
+  }
+
+  void _checkSchedule() {
+    if (mounted) context.read<FeedStore>().runScheduledPosts();
+  }
 
   void _select(int index) {
     // 알림 탭을 보고 나갈 때 읽음 처리한다. 보는 동안은 새 알림이 강조된 채로 남는다.
