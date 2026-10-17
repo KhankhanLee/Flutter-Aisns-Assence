@@ -328,11 +328,16 @@ class FeedStore extends ChangeNotifier {
     _creatingPost = true;
     notifyListeners();
     try {
+      // 컨셉 얘기만 올리지 않도록, 절반쯤은 그 사람의 다른 일상 화제를 섞는다.
+      final String? topic = persona.lifeTopics.isNotEmpty && _random.nextBool()
+          ? persona.lifeTopics[_random.nextInt(persona.lifeTopics.length)]
+          : null;
       final PersonaPhoto photo =
-          await _generatedPhoto(persona) ?? _pickExistingPhoto(persona);
+          await _generatedPhoto(persona, topic) ?? _pickExistingPhoto(persona);
       final String caption = await _gemini.generatePostCaption(
         persona: persona,
         photoDescription: photo.description,
+        topic: topic,
       );
       final Post post = Post(
         id: newId('post'),
@@ -357,7 +362,7 @@ class FeedStore extends ChangeNotifier {
   }
 
   /// 사진 생성이 켜져 있으면 오늘의 장면을 정해 사진을 만든다. 안 되면 null.
-  Future<PersonaPhoto?> _generatedPhoto(Persona persona) async {
+  Future<PersonaPhoto?> _generatedPhoto(Persona persona, String? topic) async {
     final PostImageSource? source = _imageSource;
     final DateTime? disabledUntil = _imageDisabledUntil;
     if (source == null || !source.isEnabled) return null;
@@ -368,6 +373,7 @@ class FeedStore extends ChangeNotifier {
         recentCaptions: postsBy(
           persona.id,
         ).take(3).map((Post p) => p.caption).toList(),
+        topic: topic,
       );
       final String path = await source.create(persona: persona, scene: scene);
       return (path: path, description: scene);

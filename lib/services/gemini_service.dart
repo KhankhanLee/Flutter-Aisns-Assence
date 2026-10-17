@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:assence/models/chat_message.dart';
 import 'package:assence/models/persona.dart';
 import 'package:assence/models/post.dart';
+import 'package:assence/utils/humanize.dart';
 import 'package:http/http.dart' as http;
 
 enum GeminiErrorKind {
@@ -59,8 +60,6 @@ class GeminiService {
   );
   static const String _baseUrl =
       'https://generativelanguage.googleapis.com/v1beta';
-  static const String _commentStyle =
-      '\n\n지금은 SNS 댓글로 답하는 상황이야. 캐릭터 말투를 유지하면서 1~2문장으로 짧게 답해. 따옴표나 이름표 없이 댓글 내용만 써.';
 
   String apiKey;
   String model;
@@ -70,6 +69,9 @@ class GeminiService {
   final Duration timeout;
   final http.Client _client;
 
+  /// 프롬프트에 넣는 "지금" (요일·시간대에 맞는 자연스러운 대화용).
+  final DateTime Function() _now;
+
   /// 모델을 자동으로 바꿨을 때 호출된다 (설정 저장용).
   void Function(String model)? onModelChanged;
 
@@ -78,7 +80,9 @@ class GeminiService {
     this.model = defaultModel,
     this.timeout = const Duration(seconds: 30),
     http.Client? client,
-  }) : _client = client ?? http.Client();
+    DateTime Function()? now,
+  }) : _client = client ?? http.Client(),
+       _now = now ?? DateTime.now;
 
   /// `--dart-define=GEMINI_API_KEY=...` 값으로 만든 서비스.
   /// 앱 설정에서 입력한 키가 있으면 [configure]로 덮어쓴다.
@@ -374,16 +378,17 @@ class GeminiService {
           <String, String>{'text': persona},
         ],
       },
-      'contents': history
-          .map(
-            (ChatMessage message) => <String, dynamic>{
-              'role': message.role,
-              'parts': <Map<String, String>>[
-                <String, String>{'text': message.text},
-              ],
-            },
-          )
-          .toList(),
+      'contents': <dynamic>[
+        for (final ChatMessage message in _mergeConsecutive(history))
+          <String, dynamic>{
+            'role': message.role,
+            'parts': <Map<String, String>>[
+              <String, String>{'text': message.text},
+            ],
+          },
+      ],
+      // 같은 질문에도 매번 조금씩 다르게, 사람처럼 답하도록.
+      'generationConfig': <String, dynamic>{'temperature': 1.0},
     };
 
     final http.Response response = await _send(
@@ -410,6 +415,81 @@ class GeminiService {
     return text;
   }
 
+  /// DM 말풍선이 여러 개로 나뉘어 저장되므로, 보낼 때는 같은 사람이 연달아 보낸
+  /// 메시지를 한 덩어리로 합쳐 user/model이 번갈아 오게 한다.
+  static List<ChatMessage> _mergeConsecutive(List<ChatMessage> history) {
+    final List<ChatMessage> merged = <ChatMessage>[];
+    for (final ChatMessage message in history) {
+      if (merged.isNotEmpty && merged.last.role == message.role) {
+        final ChatMessage last = merged.removeLast();
+        merged.add(
+          ChatMessage(
+            role: last.role,
+            text: '${last.text}\n${message.text}',
+            createdAt: last.createdAt,
+          ),
+        );
+      } else {
+        merged.add(message);
+      }
+    }
+    return merged;
+  }
+
+  /// 모든 캐릭터에 공통으로 붙는 "사람처럼 말하기" 규칙.
+  static String _speakingRules(Persona persona) =>
+      '[말투 규칙]\n'
+      '- 너는 AI나 챗봇이 아니라 위에 적힌 "${persona.name}" 본인이야. AI, 모델, 도와줄게 같은 말은 절대 하지 마.\n'
+      '- 마크다운을 쓰지 마. 별표(**), 샵(#), 번호 목록, 글머리표, 소제목 금지.\n'
+      '- 정리하거나 설명하거나 조언을 늘어놓지 마. 친구한테 카톡 보내듯 짧고 자연스럽게.\n'
+      '- 상대 말에 먼저 반응하고, 궁금하면 가볍게 되물어도 돼.\n'
+      '- 네 직업이나 컨셉 얘기로 억지로 끌고 가지 마. 밥, 날씨, 피곤함, 친구, 보는 드라마 같은 일상 얘기도 자연스럽게 섞어.\n'
+      '- 모르는 건 모른다고 해. 뭐든 아는 척하지 마.\n'
+      '- ${persona.maxEmoji == 0 ? '이모지는 쓰지 마. ㅋㅋ, ㅠㅠ 같은 건 괜찮아.' : '이모지는 꼭 필요할 때만 한 개까지. ㅋㅋ, ㅠㅠ 같은 건 괜찮아.'}\n'
+      '- 이름표나 따옴표 없이 할 말만 써.';
+
+  String _timeContext() {
+    final DateTime now = _now();
+    const List<String> weekdays = <String>['월', '화', '수', '목', '금', '토', '일'];
+    final int h = now.hour;
+    final String part = h < 5
+        ? '새벽'
+        : h < 11
+        ? '아침'
+        : h < 14
+        ? '점심때'
+        : h < 18
+        ? '오후'
+        : h < 22
+        ? '저녁'
+        : '밤';
+    return '[지금] ${now.month}월 ${now.day}일 ${weekdays[now.weekday - 1]}요일 $part $h시쯤';
+  }
+
+  String _systemFor(Persona persona, String situation) =>
+      '${persona.prompt}\n\n${_speakingRules(persona)}\n\n[상황]\n$situation\n\n${_timeContext()}';
+
+  /// [persona]가 DM에 답한다. 짧은 메시지 1~3개를 빈 줄로 나눠 돌려준다
+  /// (말풍선으로 나누는 건 [splitIntoBubbles]).
+  Future<String> generateChatReply({
+    required Persona persona,
+    required List<ChatMessage> history,
+  }) async {
+    final String reply = await generateReply(
+      persona: _systemFor(
+        persona,
+        '인스타 DM으로 대화 중이야. 한 번에 짧은 메시지 1~3개만 보내고, 메시지 사이는 빈 줄로 나눠. '
+        '전부 합쳐서 120자 안팎. 긴 설명이 필요한 질문이어도 친구처럼 짧게 말해.',
+      ),
+      history: history,
+    );
+    return humanizeReply(
+      reply,
+      maxEmoji: persona.maxEmoji,
+      speaker: persona.name,
+    );
+  }
+
   /// [persona]가 [post]의 댓글 스레드에 이어서 다는 답글.
   /// [thread]는 원 댓글부터 시간순이며 마지막 줄이 답할 댓글이다.
   Future<String> generateCommentReply({
@@ -417,12 +497,12 @@ class GeminiService {
     required Post post,
     required List<CommentLine> thread,
     required bool isOwnPost,
-  }) {
+  }) async {
     final String transcript = thread
         .map((CommentLine line) => '${line.author}: ${line.text}')
         .join('\n');
-    return generateReply(
-      persona: persona.prompt + _commentStyle,
+    final String reply = await generateReply(
+      persona: _systemFor(persona, '인스타 댓글에 답글을 다는 중이야. 한 문장, 40자 안팎으로 짧게.'),
       history: <ChatMessage>[
         ChatMessage(
           role: ChatMessage.userRole,
@@ -433,15 +513,21 @@ class GeminiService {
         ),
       ],
     );
+    return singleParagraph(
+      humanizeReply(reply, maxEmoji: persona.maxEmoji, speaker: persona.name),
+    );
   }
 
   /// 사용자가 올린 게시물에 [persona]가 남기는 반응 댓글.
   Future<String> generatePostReaction({
     required Persona persona,
     required String caption,
-  }) {
-    return generateReply(
-      persona: persona.prompt + _commentStyle,
+  }) async {
+    final String reply = await generateReply(
+      persona: _systemFor(
+        persona,
+        '친구 인스타 게시물에 댓글을 다는 중이야. 한 문장, 40자 안팎으로 짧게.',
+      ),
       history: <ChatMessage>[
         ChatMessage(
           role: ChatMessage.userRole,
@@ -452,48 +538,66 @@ class GeminiService {
         ),
       ],
     );
+    return singleParagraph(
+      humanizeReply(reply, maxEmoji: persona.maxEmoji, speaker: persona.name),
+    );
   }
 
   /// [persona]가 오늘 올릴 법한 사진 한 장의 장면 묘사 (사진 생성·캡션에 씀).
+  /// [topic]을 주면 그 일상 화제와 관련된 장면을 고른다.
   Future<String> generatePostScene({
     required Persona persona,
     required List<String> recentCaptions,
-  }) {
+    String? topic,
+  }) async {
     final String recent = recentCaptions.isEmpty
         ? '(없음)'
         : recentCaptions
               .map((String c) => '- ${c.split('\n').first}')
               .join('\n');
-    return generateReply(
-      persona: persona.prompt,
+    final String reply = await generateReply(
+      persona: _systemFor(persona, '오늘 인스타에 올릴 사진을 고르는 중이야.'),
       history: <ChatMessage>[
         ChatMessage(
           role: ChatMessage.userRole,
           text:
-              '오늘 인스타그램에 올릴 사진 한 장을 정하려고 해. 최근에 올린 게시물:\n$recent\n\n'
-              '이것들과 겹치지 않게, 네 일상에서 자연스러운 장면을 한 문장으로 묘사해줘. '
-              '장소, 하고 있는 일, 분위기가 드러나게. 설명이나 따옴표 없이 장면만 써.',
+              '최근에 올린 게시물:\n$recent\n\n'
+              '${topic == null ? '' : '오늘은 이 얘기랑 관련된 사진이면 좋겠어: $topic\n'}'
+              '이것들과 겹치지 않게, 네 일상에서 자연스러운 사진 장면을 한 문장으로 묘사해줘. '
+              '장소, 하고 있는 일, 분위기가 드러나게. 장면만 써.',
         ),
       ],
     );
+    return singleParagraph(humanizeReply(reply, maxEmoji: 0));
   }
 
   /// [persona]가 새 사진 게시물에 붙일 캡션 (해시태그 포함).
+  /// [topic]을 주면 사진 얘기에 그날의 일상 얘기를 한 줄 섞는다.
   Future<String> generatePostCaption({
     required Persona persona,
     required String photoDescription,
-  }) {
-    return generateReply(
-      persona: persona.prompt,
+    String? topic,
+  }) async {
+    final String reply = await generateReply(
+      persona: _systemFor(
+        persona,
+        '인스타에 사진을 올리면서 캡션을 쓰는 중이야. 1~2줄로 짧게, 해시태그는 2~4개만 끝에 붙여. '
+        '사진 설명문처럼 쓰지 말고 그냥 그날 기분이나 있었던 일을 툭 적듯이.',
+      ),
       history: <ChatMessage>[
         ChatMessage(
           role: ChatMessage.userRole,
           text:
-              '지금 인스타그램에 사진을 올리려고 해. 사진: $photoDescription\n'
-              '네 말투로 2~3줄짜리 캡션과 해시태그 3~5개를 써줘. '
-              '따옴표나 설명 없이 게시물에 올릴 내용만 써.',
+              '올릴 사진: $photoDescription\n'
+              '${topic == null ? '' : '오늘 있었던 일 중 이것도 살짝 언급해도 돼: $topic\n'}'
+              '게시물에 올릴 캡션만 써줘.',
         ),
       ],
+    );
+    return humanizeReply(
+      reply,
+      maxEmoji: persona.maxEmoji == 0 ? 0 : 1,
+      speaker: persona.name,
     );
   }
 

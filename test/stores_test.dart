@@ -163,7 +163,11 @@ void main() {
         stores.chat.historyOf('hayeon').map((ChatMessage m) => m.role),
         <String>['user', 'model'],
       );
-      expect(gemini.personas.single, stores.personas.byId('hayeon')!.prompt);
+      // 캐릭터 프로필 뒤에 공통 말투 규칙과 DM 상황 설명이 붙는다.
+      final String system = gemini.personas.single;
+      expect(system, startsWith(stores.personas.byId('hayeon')!.prompt));
+      expect(system, contains('[말투 규칙]'));
+      expect(system, contains('DM'));
       expect(stores.chat.historyOf('suyeon'), isEmpty);
     });
 
@@ -278,7 +282,7 @@ void main() {
       await stores.feed.addComment(mine.id, '혼잣말');
       expect(mine.comments.last.authorId, myUserId);
 
-      gemini.reply = '제주도 맞죠? 🌊';
+      gemini.reply = '제주도 맞죠?';
       await stores.feed.addComment(mine.id, '고마워요!', replyToId: aiComment.id);
 
       final Comment myReply = mine.comments[mine.comments.length - 2];
@@ -287,7 +291,7 @@ void main() {
       expect(aiReply.authorId, aiComment.authorId);
       expect(aiReply.parentId, aiComment.id);
       expect(aiReply.replyToId, myReply.id);
-      expect(aiReply.text, '제주도 맞죠? 🌊');
+      expect(aiReply.text, '제주도 맞죠?');
       // 스레드 맥락(AI의 첫 댓글 → 내 답글)이 프롬프트에 들어간다.
       final String prompt = gemini.requests.last.single.text;
       expect(prompt, contains('사진 너무 예뻐요!'));
@@ -322,7 +326,7 @@ void main() {
     });
 
     test('페르소나가 사진을 골라 캡션을 쓰고 새 게시물을 올린다', () async {
-      final FakeGemini gemini = FakeGemini(reply: '오늘의 기록 ✨ #일상');
+      final FakeGemini gemini = FakeGemini(reply: '오늘의 기록 #일상');
       final AppStores stores = await createTestStores(gemini);
       final String lastAuthor = stores.feed.posts.first.authorId;
 
@@ -331,7 +335,7 @@ void main() {
       expect(post, isNotNull);
       expect(stores.feed.posts.first, same(post));
       expect(post!.authorId, isNot(lastAuthor));
-      expect(post.caption, '오늘의 기록 ✨ #일상');
+      expect(post.caption, '오늘의 기록 #일상');
       expect(
         personaPhotos[post.authorId]!.map((PersonaPhoto p) => p.path),
         contains(post.imagePath),
@@ -413,6 +417,35 @@ void main() {
       final GeminiService reopened = service(fakeApi);
       AiSettingsStore(local, reopened);
       expect(reopened.apiKey, isEmpty);
+    });
+  });
+
+  group('사람 같은 DM', () {
+    test('빈 줄로 나뉜 답장은 말풍선 여러 개로 저장되고, 다음 요청에서는 합쳐진다', () async {
+      final FakeGemini gemini = FakeGemini(
+        reply: '**아 그거?**\n\n나 요즘 그거 진짜 빠졌잖아\n\n너는 요즘 뭐 해?',
+      );
+      final AppStores stores = await createTestStores(gemini);
+      stores.chat.bubbleGap = () => Duration.zero;
+
+      await stores.chat.send('jieun', '요즘 관심사가 뭔데?');
+
+      expect(
+        stores.chat.historyOf('jieun').map((ChatMessage m) => m.text),
+        <String>['요즘 관심사가 뭔데?', '아 그거?', '나 요즘 그거 진짜 빠졌잖아', '너는 요즘 뭐 해?'],
+      );
+
+      gemini.reply = 'ㅋㅋ';
+      await stores.chat.send('jieun', '나는 그냥 집');
+      // 저장된 말풍선이 그대로 서비스에 넘어간다 (합치기는 GeminiService가 한다).
+      final List<ChatMessage> sent = gemini.requests.last;
+      expect(sent.map((ChatMessage m) => m.role), <String>[
+        'user',
+        'model',
+        'model',
+        'model',
+        'user',
+      ]);
     });
   });
 }

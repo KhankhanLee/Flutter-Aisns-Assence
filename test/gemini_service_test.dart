@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:assence/data/seed_data.dart';
 import 'package:assence/models/chat_message.dart';
+import 'package:assence/models/persona.dart';
 import 'package:assence/services/gemini_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -356,6 +357,75 @@ void main() {
           ),
         ),
       );
+    });
+  });
+
+  group('사람 같은 말투', () {
+    test('DM은 프로필·공통 규칙·지금 시각을 보내고, 연달아 온 말풍선은 합쳐 보낸다', () async {
+      late Map<String, dynamic> body;
+      final GeminiService service = GeminiService(
+        apiKey: 'k',
+        now: () => DateTime(2026, 10, 16, 21, 30), // 금요일 밤
+        client: MockClient((http.Request request) async {
+          body = jsonDecode(request.body) as Map<String, dynamic>;
+          return _okResponse(
+            _candidateBody(<String>[
+              '지은: **헐 그거?**\n\n- 나도 요즘 그거 봐 😂😂\n\n너는?',
+            ]),
+          );
+        }),
+      );
+      final Persona jieun = seedPersonas.firstWhere(
+        (Persona p) => p.id == 'jieun',
+      );
+
+      final String reply = await service.generateChatReply(
+        persona: jieun,
+        history: <ChatMessage>[
+          ChatMessage(role: ChatMessage.userRole, text: '뭐해'),
+          ChatMessage(role: ChatMessage.modelRole, text: '그냥 있지'),
+          ChatMessage(role: ChatMessage.modelRole, text: '넌?'),
+          ChatMessage(role: ChatMessage.userRole, text: '요즘 뭐 봐?'),
+        ],
+      );
+
+      // 마크다운·이름표·목록 기호·이모지(지은은 0개)가 빠진다.
+      expect(reply, '헐 그거?\n\n나도 요즘 그거 봐\n\n너는?');
+
+      final String system =
+          body['system_instruction']['parts'][0]['text'] as String;
+      expect(system, startsWith(jieun.prompt));
+      expect(system, contains('마크다운을 쓰지 마'));
+      expect(system, contains('이모지는 쓰지 마'));
+      expect(system, contains('10월 16일 금요일 저녁 21시쯤'));
+      expect(body['generationConfig']['temperature'], 1.0);
+
+      final List<dynamic> contents = body['contents'] as List<dynamic>;
+      expect(contents.map((dynamic c) => c['role']), <String>[
+        'user',
+        'model',
+        'user',
+      ]);
+      expect(contents[1]['parts'][0]['text'], '그냥 있지\n넌?');
+    });
+
+    test('댓글 답글은 한 문단으로 정리한다', () async {
+      final GeminiService service = GeminiService(
+        apiKey: 'k',
+        client: MockClient(
+          (_) async =>
+              _okResponse(_candidateBody(<String>['"고마워!\n다음에 같이 가자 ✨🔥"'])),
+        ),
+      );
+      final Persona hayeon = seedPersonas.first;
+      final String reply = await service.generateCommentReply(
+        persona: hayeon,
+        post: buildSeedPosts(DateTime(2026)).first,
+        thread: <CommentLine>[(author: '사용자', text: '예뻐요')],
+        isOwnPost: true,
+      );
+      // 하연은 이모지 1개까지
+      expect(reply, '고마워! 다음에 같이 가자 ✨');
     });
   });
 }

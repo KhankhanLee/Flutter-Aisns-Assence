@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 import 'package:assence/models/comment.dart';
 import 'package:assence/models/post.dart';
 import 'package:assence/state/feed_store.dart';
+import 'package:assence/models/persona.dart';
 import 'package:assence/utils/format.dart';
+import 'package:assence/utils/humanize.dart';
 import 'package:assence/widgets/author_avatar.dart';
 
 Future<void> showCommentsSheet(BuildContext context, String postId) {
@@ -121,7 +123,11 @@ class CommentTile extends StatelessWidget {
             text: '$handle ',
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
-          TextSpan(text: comment.text),
+          TextSpan(
+            text: comment.authorId == myUserId
+                ? comment.text
+                : humanizeReply(comment.text, maxEmoji: 99),
+          ),
         ],
       ),
     );
