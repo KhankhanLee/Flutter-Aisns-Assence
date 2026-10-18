@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:assence/models/persona.dart';
@@ -14,6 +16,9 @@ import 'package:assence/widgets/author_avatar.dart';
 /// 내 스토리에서는 누가 봤는지 볼 수 있다.
 class StoryViewerPage extends StatefulWidget {
   static const Duration storyDuration = Duration(seconds: 5);
+
+  /// 본 사람 목록을 다시 계산하는 간격.
+  static const Duration refreshInterval = Duration(seconds: 30);
 
   final List<Story> stories;
   final int initialIndex;
@@ -34,12 +39,17 @@ class _StoryViewerPageState extends State<StoryViewerPage>
   final TextEditingController _reply = TextEditingController();
   final FocusNode _replyFocus = FocusNode();
   late int _index;
+  late final Timer _refresh;
 
   Story get _story => widget.stories[_index];
 
   @override
   void initState() {
     super.initState();
+    // 내 스토리를 보는 동안 새로 본 친구가 생기면 "활동" 숫자에 반영한다.
+    _refresh = Timer.periodic(StoryViewerPage.refreshInterval, (_) {
+      if (mounted) setState(() {});
+    });
     _index = widget.initialIndex.clamp(0, widget.stories.length - 1);
     _progress =
         AnimationController(
@@ -62,6 +72,7 @@ class _StoryViewerPageState extends State<StoryViewerPage>
 
   @override
   void dispose() {
+    _refresh.cancel();
     _progress.dispose();
     _reply.dispose();
     _replyFocus.dispose();
@@ -318,13 +329,37 @@ class _ProgressBars extends StatelessWidget {
 }
 
 /// 내 스토리를 본 사람과 좋아요 표시.
-class _ViewersSheet extends StatelessWidget {
+class _ViewersSheet extends StatefulWidget {
   final Story story;
 
   const _ViewersSheet({required this.story});
 
   @override
+  State<_ViewersSheet> createState() => _ViewersSheetState();
+}
+
+class _ViewersSheetState extends State<_ViewersSheet> {
+  late final Timer _refresh;
+
+  @override
+  void initState() {
+    super.initState();
+    // 시트가 열려 있는 동안 새로 본 친구를 반영한다.
+    _refresh = Timer.periodic(
+      StoryViewerPage.refreshInterval,
+      (_) => setState(() {}),
+    );
+  }
+
+  @override
+  void dispose() {
+    _refresh.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final Story story = widget.story;
     final List<StoryView> viewers = context.watch<StoryStore>().viewersOf(
       story,
     );

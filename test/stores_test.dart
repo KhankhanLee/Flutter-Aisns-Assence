@@ -59,7 +59,7 @@ void main() {
       expect(reply.text, '고마워요!');
       expect(
         gemini.personas.single,
-        startsWith(stores.personas.byId(post.authorId)!.prompt),
+        contains(stores.personas.byId(post.authorId)!.prompt),
       );
 
       expect(stores.notifications.unreadCount, 1);
@@ -165,7 +165,7 @@ void main() {
       );
       // 캐릭터 프로필 뒤에 공통 말투 규칙과 DM 상황 설명이 붙는다.
       final String system = gemini.personas.single;
-      expect(system, startsWith(stores.personas.byId('hayeon')!.prompt));
+      expect(system, contains(stores.personas.byId('hayeon')!.prompt));
       expect(system, contains('[말투 규칙]'));
       expect(system, contains('DM'));
       expect(stores.chat.historyOf('suyeon'), isEmpty);

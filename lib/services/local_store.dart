@@ -22,6 +22,9 @@ class LocalStore {
     }
   }
 
+  /// 다른 isolate(백그라운드 작업)가 바꾼 값을 다시 읽어 온다.
+  Future<void> reload() => _prefs.reload();
+
   Future<void> writeJson(String key, Object? value) =>
       _prefs.setString(key, jsonEncode(value));
 }

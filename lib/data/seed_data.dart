@@ -111,6 +111,22 @@ const Map<String, PostingHabit> personaHabits = <String, PostingHabit>{
   'naeun': PostingHabit(postsPerWeek: 2, startHour: 21, endHour: 26),
 };
 
+/// 페르소나별 스토리 습관 (게시물보다 가볍게 자주 올린다).
+const Map<String, PostingHabit> personaStoryHabits = <String, PostingHabit>{
+  'hayeon': PostingHabit(postsPerWeek: 5, startHour: 9, endHour: 21),
+  'suyeon': PostingHabit(postsPerWeek: 4, startHour: 6, endHour: 21),
+  'jieun': PostingHabit(postsPerWeek: 3, startHour: 11, endHour: 25),
+  'naeun': PostingHabit(postsPerWeek: 4, startHour: 21, endHour: 26),
+};
+
+/// 페르소나가 사용자에게 먼저 DM을 보내는 습관 (일주일에 1~2번).
+const Map<String, PostingHabit> personaDmHabits = <String, PostingHabit>{
+  'hayeon': PostingHabit(postsPerWeek: 2, startHour: 10, endHour: 21),
+  'suyeon': PostingHabit(postsPerWeek: 1.5, startHour: 7, endHour: 21),
+  'jieun': PostingHabit(postsPerWeek: 1, startHour: 12, endHour: 24),
+  'naeun': PostingHabit(postsPerWeek: 1.5, startHour: 21, endHour: 26),
+};
+
 typedef PersonaPhoto = ({String path, String description});
 
 /// 페르소나가 새 게시물을 올릴 때 고르는 사진. 설명은 캡션 생성 프롬프트에 들어간다.

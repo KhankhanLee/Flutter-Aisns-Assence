@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:assence/app.dart';
 import 'package:assence/navigation.dart';
 import 'package:assence/pages/compose_page.dart';
 import 'package:assence/pages/feed_page.dart';
@@ -9,11 +10,8 @@ import 'package:assence/pages/notifications_page.dart';
 import 'package:assence/pages/profile_page.dart';
 import 'package:assence/pages/search_page.dart';
 import 'package:assence/pages/settings_page.dart';
-import 'package:assence/state/ai_settings_store.dart';
 import 'package:assence/state/chat_store.dart';
-import 'package:assence/state/feed_store.dart';
 import 'package:assence/state/notification_store.dart';
-import 'package:assence/state/story_store.dart';
 import 'package:assence/state/user_profile_store.dart';
 import 'package:assence/widgets/assence_logo.dart';
 
@@ -34,7 +32,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   int _currentIndex = feedTab;
 
   Timer? _scheduleTimer;
-  bool _sendingStoryReplies = false;
 
   @override
   void initState() {
@@ -42,7 +39,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     // AI 친구는 각자 게시 일정이 있다. 앱을 열 때, 다시 돌아올 때, 켜 둔 동안
     // 15분마다 예정 시각이 지난 친구가 있는지 확인한다.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkSchedule());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkSchedule();
+      // 알림을 눌러 앱을 열었으면 그 화면으로 간다.
+      final String? target = takePendingTarget();
+      if (target != null && mounted) openTarget(context, target);
+    });
     _scheduleTimer = Timer.periodic(
       const Duration(minutes: 15),
       (_) => _checkSchedule(),
@@ -61,31 +63,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) _checkSchedule();
   }
 
+  /// 할 차례가 된 AI 친구 활동(게시물, 스토리, DM, 친구끼리 댓글)을 처리한다.
+  /// 앱이 켜져 있을 때는 폰 알림 대신 뱃지로 보여준다.
   void _checkSchedule() {
     if (!mounted) return;
-    context.read<FeedStore>().runScheduledPosts();
-    _sendStoryReplies();
-  }
-
-  /// 내 스토리를 본 AI 친구 중 DM을 보낼 차례가 된 친구가 보낸다.
-  /// 실패하면(한도 등) 다음 확인 때 다시 시도한다.
-  Future<void> _sendStoryReplies() async {
-    final StoryStore stories = context.read<StoryStore>();
-    final ChatStore chat = context.read<ChatStore>();
-    if (_sendingStoryReplies || !context.read<AiSettingsStore>().isConfigured) {
-      return;
-    }
-    _sendingStoryReplies = true;
-    try {
-      for (final DueStoryReply due in stories.dueReplies()) {
-        if (!await chat.receiveStoryReaction(due.view.personaId, due.story)) {
-          return;
-        }
-        stories.markReplied(due.view);
-      }
-    } finally {
-      _sendingStoryReplies = false;
-    }
+    context.read<AppStores>().runner.runDue();
   }
 
   void _select(int index) {
