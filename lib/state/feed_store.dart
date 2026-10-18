@@ -9,6 +9,7 @@ import 'package:assence/models/post.dart';
 import 'package:assence/services/gemini_service.dart';
 import 'package:assence/services/local_store.dart';
 import 'package:assence/services/post_image_source.dart';
+import 'package:assence/state/ai_budget.dart';
 import 'package:assence/state/notification_store.dart';
 import 'package:assence/state/persona_store.dart';
 import 'package:assence/state/post_schedule.dart';
@@ -21,6 +22,16 @@ class FeedStore extends ChangeNotifier {
 
   /// 한 번 확인할 때 올리는 최대 게시물 수. 오래 앱을 안 열어도 한꺼번에 몰리지 않게 한다.
   static const int maxPostsPerCheck = 2;
+
+  /// AI 친구끼리 반응: 친구 게시물에 좋아요를 누를 확률, 댓글을 달 확률,
+  /// 게시물당 댓글 수 상한, 게시물 주인이 그 댓글에 답글을 달 확률.
+  static const double friendLikeChance = 0.7;
+  static const double friendCommentChance = 0.35;
+  static const int maxFriendComments = 2;
+  static const double ownerReplyChance = 0.4;
+
+  /// 한 번 확인할 때 다는 AI 친구 댓글 수 상한.
+  static const int maxFriendCommentsPerCheck = 2;
 
   /// 사진 생성이 실패하면 이 시간 동안은 시도하지 않고 기존 사진을 쓴다.
   static const Duration imageRetryDelay = Duration(hours: 12);
@@ -339,13 +350,15 @@ class FeedStore extends ChangeNotifier {
         photoDescription: photo.description,
         topic: topic,
       );
+      final DateTime createdAt = at ?? _now();
       final Post post = Post(
         id: newId('post'),
         authorId: persona.id,
         imagePath: photo.path,
         caption: caption,
-        createdAt: at ?? _now(),
+        createdAt: createdAt,
         likes: 50 + _random.nextInt(450),
+        friendReactions: _planFriendReactions(persona.id, createdAt),
       );
       _insertByTime(post);
       _notifications.add(
@@ -359,6 +372,128 @@ class FeedStore extends ChangeNotifier {
       _creatingPost = false;
       _changed();
     }
+  }
+
+  /// 다른 AI 친구들이 이 게시물을 언제 보고, 좋아요·댓글을 남길지 정한다.
+  /// 각자 활동 시간 안에서 30분~6시간 뒤에 본다.
+  List<FriendReaction> _planFriendReactions(String authorId, DateTime from) {
+    final List<FriendReaction> plan = <FriendReaction>[];
+    int comments = 0;
+    for (final Persona friend in seedPersonas) {
+      if (friend.id == authorId) continue;
+      final bool liked = _random.nextDouble() < friendLikeChance;
+      final bool comment =
+          comments < maxFriendComments &&
+          _random.nextDouble() < friendCommentChance;
+      if (!liked && !comment) continue;
+      if (comment) comments++;
+      DateTime at = from.add(Duration(minutes: 30 + _random.nextInt(330)));
+      final PostingHabit? habit = personaHabits[friend.id];
+      if (habit != null) at = habit.fitActiveHours(at, _random);
+      plan.add(
+        FriendReaction(
+          personaId: friend.id,
+          at: at,
+          liked: liked,
+          comment: comment,
+        ),
+      );
+    }
+    return plan;
+  }
+
+  /// 시각이 지난 AI 친구 댓글(과 게시물 주인의 답글)을 단다. 단 댓글 수를 돌려준다.
+  /// 좋아요는 시각이 지나면 화면에 바로 보이므로 여기서 할 일이 없다.
+  /// 요청이 실패하거나 오늘 예산을 다 썼으면 다음 확인 때 다시 시도한다.
+  Future<int> runFriendReactions({required AiBudget budget}) async {
+    if (!_gemini.isConfigured) return 0;
+    final DateTime now = _now();
+    int added = 0;
+    for (final Post post in List<Post>.of(_posts)) {
+      if (now.difference(post.createdAt) > const Duration(days: 2)) continue;
+      for (final FriendReaction r in List<FriendReaction>.of(
+        post.friendReactions,
+      )) {
+        if (r.done || !r.comment || r.at.isAfter(now)) continue;
+        if (added >= maxFriendCommentsPerCheck || !budget.trySpend()) {
+          return added;
+        }
+        final Persona? persona = _personas.byId(r.personaId);
+        final Persona? author = _personas.byId(post.authorId);
+        if (persona == null || author == null) {
+          r.done = true;
+          continue;
+        }
+        try {
+          final Comment comment = await _friendComment(
+            post,
+            r,
+            persona,
+            author,
+          );
+          post.comments.add(comment);
+          r.done = true;
+          added++;
+          // 친구 댓글에는 가끔 게시물 주인이 답글을 단다.
+          if (r.replyToCommentId == null &&
+              _random.nextDouble() < ownerReplyChance) {
+            final PostingHabit? habit = personaHabits[author.id];
+            DateTime at = now.add(Duration(minutes: 10 + _random.nextInt(110)));
+            if (habit != null) at = habit.fitActiveHours(at, _random);
+            post.friendReactions.add(
+              FriendReaction(
+                personaId: author.id,
+                at: at,
+                comment: true,
+                replyToCommentId: comment.id,
+              ),
+            );
+          }
+          _changed();
+        } on GeminiException {
+          return added;
+        }
+      }
+    }
+    return added;
+  }
+
+  Future<Comment> _friendComment(
+    Post post,
+    FriendReaction r,
+    Persona persona,
+    Persona author,
+  ) async {
+    final Comment? target = _commentById(post, r.replyToCommentId);
+    if (target == null) {
+      return Comment(
+        id: newId('comment'),
+        postId: post.id,
+        authorId: persona.id,
+        text: await _gemini.generateFriendComment(
+          persona: persona,
+          post: post,
+          authorName: author.name,
+        ),
+        createdAt: _now(),
+      );
+    }
+    final String rootId = target.parentId ?? target.id;
+    return Comment(
+      id: newId('comment'),
+      postId: post.id,
+      authorId: persona.id,
+      text: await _gemini.generateCommentReply(
+        persona: persona,
+        post: post,
+        thread: _threadUntil(post, target),
+        isOwnPost: post.authorId == persona.id,
+        background: true,
+      ),
+      createdAt: _now(),
+      parentId: rootId,
+      replyToId: target.id,
+    );
   }
 
   /// 사진 생성이 켜져 있으면 오늘의 장면을 정해 사진을 만든다. 안 되면 null.

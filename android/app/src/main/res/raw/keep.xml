@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 알림 아이콘으로 쓰는 런처 아이콘이 릴리스 빌드에서 지워지지 않게 한다. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@mipmap/ic_launcher" />

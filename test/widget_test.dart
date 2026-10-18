@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:assence/app.dart';
 import 'package:assence/models/chat_message.dart';
+import 'package:assence/models/post.dart';
+import 'package:assence/utils/format.dart';
 import 'package:assence/pages/api_key_page.dart';
 import 'package:assence/pages/home_page.dart';
 import 'package:assence/pages/splash_page.dart';
@@ -361,6 +363,55 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(SplashPage), findsNothing);
     expect(find.byType(HomePage), findsOneWidget);
+  });
+
+  testWidgets('AI 친구가 좋아요를 누른 게시물은 "○○님 외 N명이 좋아합니다"로 보인다', (
+    WidgetTester tester,
+  ) async {
+    final AppStores stores = await createTestStores(FakeGemini());
+    final Post post = stores.feed.posts.first;
+    post.friendReactions.add(
+      FriendReaction(
+        personaId: 'naeun',
+        at: DateTime.now().subtract(const Duration(minutes: 5)),
+        liked: true,
+      ),
+    );
+    await tester.pumpWidget(AssenceApp(stores: stores, showSplash: false));
+    await tester.pump();
+
+    expect(
+      find.text(
+        'naeun_night님 외 ${formatCount(post.likes)}명이 좋아합니다',
+        findRichText: true,
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('설정에서 폰 알림을 켜면 세부 항목을 바꿀 수 있다', (WidgetTester tester) async {
+    final AppStores stores = await createTestStores(FakeGemini());
+    await tester.pumpWidget(AssenceApp(stores: stores, showSplash: false));
+    await tester.pump();
+    await tester.tap(find.byTooltip('프로필'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('설정'));
+    await tester.pumpAndSettle();
+
+    final Finder storiesSwitch = find.widgetWithText(
+      SwitchListTile,
+      '친구 새 스토리',
+    );
+    await tester.scrollUntilVisible(storiesSwitch, 200);
+    expect(tester.widget<SwitchListTile>(storiesSwitch).onChanged, isNull);
+
+    await tester.tap(find.text('폰 알림 받기'));
+    await tester.pumpAndSettle();
+    expect(stores.notificationSettings.enabled, isTrue);
+
+    await tester.tap(storiesSwitch);
+    await tester.pump();
+    expect(stores.notificationSettings.stories, isTrue);
   });
 
   testWidgets('설정에서 프로필 닉네임을 바꾸면 프로필과 댓글에 반영된다', (WidgetTester tester) async {

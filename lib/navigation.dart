@@ -16,6 +16,30 @@ Future<void> openChat(BuildContext context, {String? personaId}) {
   );
 }
 
+/// 알림을 누르고 들어왔을 때 갈 곳. 홈 화면이 뜨면 [takePendingTarget]으로 꺼내 간다.
+String? _pendingTarget;
+
+void setPendingTarget(String target) => _pendingTarget = target;
+
+String? takePendingTarget() {
+  final String? target = _pendingTarget;
+  _pendingTarget = null;
+  return target;
+}
+
+/// 알림 payload(`chat:<personaId>` / `post:<postId>`)에 맞는 화면을 연다.
+Future<void> openTarget(BuildContext context, String target) async {
+  final int colon = target.indexOf(':');
+  if (colon < 0) return;
+  final String id = target.substring(colon + 1);
+  switch (target.substring(0, colon)) {
+    case 'chat':
+      await openChat(context, personaId: id);
+    case 'post':
+      await openPost(context, id);
+  }
+}
+
 Future<void> openPost(BuildContext context, String postId) {
   return Navigator.of(context).push(
     MaterialPageRoute<void>(builder: (_) => PostDetailPage(postId: postId)),

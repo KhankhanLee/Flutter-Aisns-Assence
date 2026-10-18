@@ -5,8 +5,10 @@ import 'package:assence/pages/api_key_page.dart';
 import 'package:assence/data/seed_data.dart';
 import 'package:assence/models/post.dart';
 import 'package:assence/services/gemini_service.dart';
+import 'package:assence/services/notification_service.dart';
 import 'package:assence/state/ai_settings_store.dart';
 import 'package:assence/state/feed_store.dart';
+import 'package:assence/state/notification_settings_store.dart';
 import 'package:assence/state/persona_store.dart';
 import 'package:assence/state/post_schedule.dart';
 import 'package:assence/utils/format.dart';
@@ -71,6 +73,8 @@ class SettingsPage extends StatelessWidget {
                 ? (bool value) => ai.imageGeneration = value
                 : null,
           ),
+          const _SectionTitle('알림'),
+          const _NotificationSettings(),
           const _SectionTitle('AI 친구 게시 일정'),
           for (final MapEntry<String, PostingHabit> habit
               in personaHabits.entries)
@@ -148,3 +152,71 @@ String _providerName(AiProvider provider) => switch (provider) {
   AiProvider.gemini => 'Gemini',
   AiProvider.claude => 'Claude',
 };
+
+/// 앱을 닫아 둬도 AI 친구 소식을 폰 알림으로 받는 설정.
+class _NotificationSettings extends StatelessWidget {
+  const _NotificationSettings();
+
+  Future<void> _toggleAll(BuildContext context, bool value) async {
+    final NotificationSettingsStore settings = context
+        .read<NotificationSettingsStore>();
+    if (value) {
+      bool granted = true;
+      try {
+        granted = await LocalNotifier.requestPermission();
+      } catch (_) {
+        // 알림 플러그인이 없는 환경(테스트 등)
+      }
+      if (!granted) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('알림 권한이 꺼져 있어요. 폰 설정 > 앱 > Assence에서 알림을 허용해 주세요.'),
+            ),
+          );
+        }
+        return;
+      }
+    }
+    settings.update(enabled: value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final NotificationSettingsStore settings = context
+        .watch<NotificationSettingsStore>();
+    final bool on = settings.enabled;
+    return Column(
+      children: <Widget>[
+        SwitchListTile(
+          secondary: const Icon(Icons.notifications_outlined),
+          title: const Text('폰 알림 받기'),
+          subtitle: const Text(
+            '앱을 닫아 둬도 1시간쯤마다 AI 친구 소식을 확인해서 알려줘요. '
+            '배터리 절약 모드에서는 늦게 올 수 있어요.',
+          ),
+          value: on,
+          onChanged: (bool value) => _toggleAll(context, value),
+        ),
+        SwitchListTile(
+          title: const Text('새 DM'),
+          value: settings.dm,
+          onChanged: on ? (bool v) => settings.update(dm: v) : null,
+          dense: true,
+        ),
+        SwitchListTile(
+          title: const Text('댓글·새 게시물'),
+          value: settings.activity,
+          onChanged: on ? (bool v) => settings.update(activity: v) : null,
+          dense: true,
+        ),
+        SwitchListTile(
+          title: const Text('친구 새 스토리'),
+          value: settings.stories,
+          onChanged: on ? (bool v) => settings.update(stories: v) : null,
+          dense: true,
+        ),
+      ],
+    );
+  }
+}

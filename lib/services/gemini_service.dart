@@ -866,22 +866,32 @@ class GeminiService {
     required Post post,
     required List<CommentLine> thread,
     required bool isOwnPost,
+    bool background = false,
   }) async {
     final String transcript = thread
         .map((CommentLine line) => '${line.author}: ${line.text}')
         .join('\n');
-    final String reply = await _replyInCharacter(
-      system: _systemFor(persona, '인스타 댓글에 답글을 다는 중이야. 한 문장, 40자 안팎으로 짧게.'),
-      history: <ChatMessage>[
-        ChatMessage(
-          role: ChatMessage.userRole,
-          text:
-              '${isOwnPost ? '네가 올린' : '친구가 올린'} 게시물 내용:\n${post.caption}\n\n'
-              '댓글 스레드 (위에서부터 시간순, "${persona.name}"은 너야):\n$transcript\n\n'
-              '마지막 댓글에 이어서 답글을 달아줘.',
-        ),
-      ],
+    final String system = _systemFor(
+      persona,
+      '인스타 댓글에 답글을 다는 중이야. 한 문장, 40자 안팎으로 짧게.',
     );
+    final List<ChatMessage> history = <ChatMessage>[
+      ChatMessage(
+        role: ChatMessage.userRole,
+        text:
+            '${isOwnPost ? '네가 올린' : '친구가 올린'} 게시물 내용:\n${post.caption}\n\n'
+            '댓글 스레드 (위에서부터 시간순, "${persona.name}"은 너야):\n$transcript\n\n'
+            '마지막 댓글에 이어서 답글을 달아줘.',
+      ),
+    ];
+    // 백그라운드(AI끼리 주고받는 답글)는 한도를 아끼려고 다시 받지 않는다.
+    final String reply = background
+        ? await generateReply(
+            persona: system,
+            history: history,
+            background: true,
+          )
+        : await _replyInCharacter(system: system, history: history);
     return singleParagraph(
       humanizeReply(reply, maxEmoji: persona.maxEmoji, speaker: persona.name),
     );
@@ -910,6 +920,98 @@ class GeminiService {
     );
     return singleParagraph(
       humanizeReply(reply, maxEmoji: persona.maxEmoji, speaker: persona.name),
+    );
+  }
+
+  /// [persona]가 친구 AI([authorName])의 게시물에 다는 댓글. 백그라운드 요청이다.
+  Future<String> generateFriendComment({
+    required Persona persona,
+    required Post post,
+    required String authorName,
+  }) async {
+    final String reply = await generateReply(
+      persona: _systemFor(
+        persona,
+        '친한 친구 $authorName의 인스타 게시물에 댓글을 다는 중이야. '
+        '한 문장, 30자 안팎으로 짧게. 친구끼리 하듯 편하게.',
+      ),
+      history: <ChatMessage>[
+        ChatMessage(
+          role: ChatMessage.userRole,
+          text:
+              '$authorName이(가) 올린 게시물 문구:\n'
+              '${post.caption.isEmpty ? '(문구 없음)' : post.caption}\n\n'
+              '이 게시물에 댓글을 남겨줘.',
+        ),
+      ],
+      background: true,
+    );
+    return singleParagraph(
+      humanizeReply(reply, maxEmoji: persona.maxEmoji, speaker: persona.name),
+    );
+  }
+
+  /// [persona]가 올릴 스토리의 한 줄 문구. 백그라운드 요청이다.
+  Future<String> generateStoryText({
+    required Persona persona,
+    required String photoDescription,
+    String? topic,
+  }) async {
+    final String reply = await generateReply(
+      persona: _systemFor(
+        persona,
+        '인스타 스토리에 사진을 올리면서 한 줄 적는 중이야. 20자 안팎, 해시태그 없이. '
+        '혼잣말이나 친구들한테 툭 던지는 말처럼.',
+      ),
+      history: <ChatMessage>[
+        ChatMessage(
+          role: ChatMessage.userRole,
+          text:
+              '올릴 사진: $photoDescription\n'
+              '${topic == null ? '' : '요즘 있었던 일 중 이것도 떠올려 봐: $topic\n'}'
+              '스토리에 적을 한 줄만 써줘.',
+        ),
+      ],
+      background: true,
+    );
+    return singleParagraph(
+      humanizeReply(
+        reply,
+        maxEmoji: persona.maxEmoji,
+        speaker: persona.name,
+      ).replaceAll(RegExp(r'#\S+'), ''),
+    );
+  }
+
+  /// [persona]가 먼저 보내는 DM. 이전 대화가 있으면 이어서, 없으면 안부로 시작한다.
+  /// 백그라운드 요청이다.
+  Future<String> generateOpener({
+    required Persona persona,
+    required List<ChatMessage> history,
+    String? topic,
+  }) async {
+    final String reply = await generateReply(
+      persona: _systemFor(
+        persona,
+        '친구한테 네가 먼저 카톡하듯 DM을 보내는 중이야. 짧은 메시지 1~2개, 메시지 사이는 빈 줄로 나눠. '
+        '전부 합쳐서 60자 안팎. 안부를 묻거나 오늘 있었던 일을 꺼내. '
+        '전에 약속한 게 있으면 그 얘기를 꺼내도 좋아.',
+      ),
+      history: <ChatMessage>[
+        ...history,
+        ChatMessage(
+          role: ChatMessage.userRole,
+          text:
+              '(한동안 대화가 없었어. 네가 먼저 말을 걸어줘.'
+              '${topic == null ? '' : ' 오늘 떠오른 얘깃거리: $topic'})',
+        ),
+      ],
+      background: true,
+    );
+    return humanizeReply(
+      reply,
+      maxEmoji: persona.maxEmoji,
+      speaker: persona.name,
     );
   }
 

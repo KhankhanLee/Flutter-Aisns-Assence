@@ -89,10 +89,7 @@ class PostCard extends StatelessWidget {
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Text(
-            '좋아요 ${formatCount(post.likes)}개',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
+          child: _LikesLine(post: post),
         ),
         if (post.caption.isNotEmpty)
           Padding(
@@ -169,6 +166,39 @@ class PostCard extends StatelessWidget {
         ),
         const SizedBox(height: 20),
       ],
+    );
+  }
+}
+
+/// "좋아요 N개", 또는 AI 친구가 눌렀으면 "hayeon_daily님 외 N명이 좋아합니다".
+class _LikesLine extends StatelessWidget {
+  final Post post;
+
+  const _LikesLine({required this.post});
+
+  @override
+  Widget build(BuildContext context) {
+    final List<String> friends = post.friendLikersAt(DateTime.now());
+    final int total = post.likes + friends.length;
+    const TextStyle bold = TextStyle(fontWeight: FontWeight.bold);
+    if (friends.isEmpty) {
+      return Text('좋아요 ${formatCount(total)}개', style: bold);
+    }
+    return RichText(
+      text: TextSpan(
+        style: const TextStyle(color: Colors.black, fontSize: 14),
+        children: <TextSpan>[
+          TextSpan(text: authorHandle(context, friends.last), style: bold),
+          const TextSpan(text: '님 '),
+          if (total > 1) ...<TextSpan>[
+            const TextSpan(text: '외 '),
+            TextSpan(text: '${formatCount(total - 1)}명', style: bold),
+            const TextSpan(text: '이 '),
+          ] else
+            const TextSpan(text: '이 '),
+          const TextSpan(text: '좋아합니다'),
+        ],
+      ),
     );
   }
 }

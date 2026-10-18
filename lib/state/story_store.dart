@@ -4,7 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:assence/data/seed_data.dart';
 import 'package:assence/models/persona.dart';
 import 'package:assence/models/story.dart';
+import 'package:assence/services/gemini_service.dart';
 import 'package:assence/services/local_store.dart';
+import 'package:assence/state/ai_budget.dart';
 import 'package:assence/state/post_schedule.dart';
 import 'package:assence/utils/format.dart';
 
@@ -14,6 +16,11 @@ typedef DueStoryReply = ({Story story, StoryView view});
 class StoryStore extends ChangeNotifier {
   static const String _storageKey = 'my_stories';
   static const String _likedKey = 'liked_stories';
+  static const String _personaStoriesKey = 'persona_stories';
+  static const String _scheduleKey = 'persona_next_story';
+
+  /// 한 번 확인할 때 새로 올리는 페르소나 스토리 수 상한.
+  static const int maxStoriesPerCheck = 2;
 
   /// 내 스토리를 페르소나가 볼 확률, 본 사람이 좋아요를 누를 확률.
   static const double viewChance = 0.85;
@@ -25,14 +32,44 @@ class StoryStore extends ChangeNotifier {
   final LocalStore _local;
   final DateTime Function() _now;
   final Random _random;
-  final List<Story> _personaStories;
+  final List<Story> _personaStories = <Story>[]; // 오래된 순
+  final Map<String, DateTime> _nextStoryAt = <String, DateTime>{};
   final List<Story> _myStories = <Story>[]; // 오래된 순
   final Set<String> _liked = <String>{}; // 내가 좋아요한 페르소나 스토리 ID
 
   StoryStore(this._local, {DateTime Function()? now, Random? random})
     : _now = now ?? DateTime.now,
-      _random = random ?? Random(),
-      _personaStories = buildSeedPersonaStories((now ?? DateTime.now)()) {
+      _random = random ?? Random() {
+    // 페르소나 스토리는 저장해 두고, 처음 실행할 때만 시드로 시작한다.
+    final Object? personaSaved = _local.readJson(_personaStoriesKey);
+    if (personaSaved is List<dynamic>) {
+      _personaStories.addAll(
+        personaSaved.map(
+          (dynamic json) => Story.fromJson(json as Map<String, dynamic>),
+        ),
+      );
+    } else {
+      _personaStories.addAll(buildSeedPersonaStories(_now()).reversed.toList());
+      _savePersonaStories();
+    }
+    final Object? schedule = _local.readJson(_scheduleKey);
+    if (schedule is Map<String, dynamic>) {
+      schedule.forEach((String id, dynamic time) {
+        _nextStoryAt[id] = DateTime.parse(time as String);
+      });
+    }
+    for (final MapEntry<String, PostingHabit> habit
+        in personaStoryHabits.entries) {
+      _nextStoryAt.putIfAbsent(
+        habit.key,
+        () => habit.value.nextAfter(
+          _latestStoryOf(habit.key)?.createdAt ?? _now(),
+          _random,
+        ),
+      );
+    }
+    _saveSchedule();
+
     final Object? saved = _local.readJson(_storageKey);
     if (saved is List<dynamic>) {
       _myStories.addAll(
@@ -69,6 +106,108 @@ class StoryStore extends ChangeNotifier {
   /// 24시간이 지나지 않은 내 스토리.
   List<Story> get myActiveStories =>
       _myStories.where((Story s) => s.isActive(_now())).toList();
+
+  Story? _latestStoryOf(String personaId) =>
+      _personaStories.where((Story s) => s.authorId == personaId).lastOrNull;
+
+  /// 페르소나별 다음 스토리 예정 시각 (설정 화면 표시용).
+  Map<String, DateTime> get nextStoryTimes =>
+      Map<String, DateTime>.unmodifiable(_nextStoryAt);
+
+  /// 스토리 예정 시각이 지난 페르소나가 새 스토리를 올린다. 올린 스토리를 돌려준다.
+  /// 사진은 그 페르소나의 사진 중에서 고르고(최근 스토리 사진은 피함), 문구는
+  /// AI가 쓴다. AI 키가 없으면 사진만 올리고, 요청이 실패하거나 오늘 예산을 다
+  /// 썼으면 한 시간 뒤로 미룬다.
+  Future<List<Story>> runScheduledStories({
+    required GeminiService gemini,
+    required List<Persona> personas,
+    required AiBudget budget,
+  }) async {
+    final DateTime now = _now();
+    final List<Story> posted = <Story>[];
+    final List<String> due =
+        _nextStoryAt.keys
+            .where((String id) => !_nextStoryAt[id]!.isAfter(now))
+            .toList()
+          ..sort(
+            (String a, String b) =>
+                _nextStoryAt[a]!.compareTo(_nextStoryAt[b]!),
+          );
+    for (final String id in due) {
+      final PostingHabit habit = personaStoryHabits[id]!;
+      final Persona? persona = personas
+          .where((Persona p) => p.id == id)
+          .firstOrNull;
+      final List<PersonaPhoto>? pool = personaPhotos[id];
+      if (persona == null || pool == null) {
+        _nextStoryAt[id] = habit.nextAfter(now, _random);
+        continue;
+      }
+      if (posted.length >= maxStoriesPerCheck) {
+        _nextStoryAt[id] = habit.fitActiveHours(
+          now.add(Duration(minutes: 30 + _random.nextInt(120))),
+          _random,
+        );
+        continue;
+      }
+      final String? lastPhoto = _latestStoryOf(id)?.imagePath;
+      final List<PersonaPhoto> choices = pool
+          .where((PersonaPhoto p) => p.path != lastPhoto)
+          .toList();
+      final List<PersonaPhoto> from = choices.isEmpty ? pool : choices;
+      final PersonaPhoto photo = from[_random.nextInt(from.length)];
+
+      String text = '';
+      if (gemini.isConfigured) {
+        if (!budget.trySpend()) {
+          _nextStoryAt[id] = now.add(const Duration(hours: 1));
+          continue;
+        }
+        try {
+          final String? topic =
+              persona.lifeTopics.isNotEmpty && _random.nextBool()
+              ? persona.lifeTopics[_random.nextInt(persona.lifeTopics.length)]
+              : null;
+          text = await gemini.generateStoryText(
+            persona: persona,
+            photoDescription: photo.description,
+            topic: topic,
+          );
+        } on GeminiException {
+          _nextStoryAt[id] = now.add(const Duration(hours: 1));
+          continue;
+        }
+      }
+      final Story story = Story(
+        id: newId('story_$id'),
+        authorId: id,
+        imagePath: photo.path,
+        text: text,
+        createdAt: now,
+      );
+      _personaStories.add(story);
+      posted.add(story);
+      _nextStoryAt[id] = habit.nextAfter(now, _random);
+    }
+    _personaStories.removeWhere((Story s) => !s.isActive(now));
+    _savePersonaStories();
+    _saveSchedule();
+    if (posted.isNotEmpty) notifyListeners();
+    return posted;
+  }
+
+  void _savePersonaStories() => _local.writeJson(
+    _personaStoriesKey,
+    _personaStories.map((Story s) => s.toJson()).toList(),
+  );
+
+  void _saveSchedule() => _local.writeJson(
+    _scheduleKey,
+    _nextStoryAt.map(
+      (String id, DateTime time) =>
+          MapEntry<String, String>(id, time.toIso8601String()),
+    ),
+  );
 
   /// [personaIds] 순서대로, 아직 만료되지 않은 페르소나 스토리.
   List<Story> storiesOf(List<String> personaIds) => <Story>[
