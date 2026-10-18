@@ -14,6 +14,7 @@ class UserProfileStore extends ChangeNotifier {
   String _handle = defaultHandle;
   String _name = defaultName;
   String _bio = defaultBio;
+  String? _avatarPath;
 
   UserProfileStore(this._local) {
     final Object? saved = _local.readJson(_storageKey);
@@ -21,12 +22,22 @@ class UserProfileStore extends ChangeNotifier {
       _handle = saved['handle'] as String? ?? defaultHandle;
       _name = saved['name'] as String? ?? defaultName;
       _bio = saved['bio'] as String? ?? defaultBio;
+      _avatarPath = saved['avatarPath'] as String?;
     }
   }
 
   String get handle => _handle;
   String get name => _name;
   String get bio => _bio;
+
+  /// 프로필 사진(기기 파일 경로). 없으면 기본 아이콘.
+  String? get avatarPath => _avatarPath;
+
+  void setAvatar(String? path) {
+    _avatarPath = path;
+    _save();
+    notifyListeners();
+  }
 
   /// 계정명 규칙 위반이면 안내 문구, 사용할 수 있으면 null.
   /// [takenHandles]는 페르소나 계정명처럼 이미 쓰이는 이름들.
@@ -54,11 +65,14 @@ class UserProfileStore extends ChangeNotifier {
     _handle = handle.trim();
     _name = name.trim().isEmpty ? defaultName : name.trim();
     _bio = bio.trim();
-    _local.writeJson(_storageKey, <String, dynamic>{
-      'handle': _handle,
-      'name': _name,
-      'bio': _bio,
-    });
+    _save();
     notifyListeners();
   }
+
+  void _save() => _local.writeJson(_storageKey, <String, dynamic>{
+    'handle': _handle,
+    'name': _name,
+    'bio': _bio,
+    if (_avatarPath != null) 'avatarPath': _avatarPath,
+  });
 }

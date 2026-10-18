@@ -15,6 +15,14 @@ class AuthorAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (authorId == myUserId) {
+      final String? mine = context.watch<UserProfileStore>().avatarPath;
+      if (mine != null) {
+        return CircleAvatar(
+          radius: radius,
+          backgroundColor: Colors.grey[300],
+          backgroundImage: appImageProvider(mine),
+        );
+      }
       return CircleAvatar(
         radius: radius,
         backgroundColor: Colors.grey[300],

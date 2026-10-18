@@ -721,7 +721,17 @@ class GeminiService {
     final List<ChatMessage> expanded = <ChatMessage>[];
     for (final ChatMessage message in history) {
       final SharedStory? story = message.story;
-      if (story == null) {
+      if (message.imagePath != null) {
+        // 사진 자체는 이번에 보낸 것만 따로 붙이고, 예전 사진은 글로만 남긴다.
+        expanded.add(
+          ChatMessage(
+            role: message.role,
+            text: message.text.isEmpty
+                ? '(사진을 보냈어)'
+                : '(사진을 보냈어) ${message.text}',
+          ),
+        );
+      } else if (story == null) {
         expanded.add(message);
       } else if (message.isUser) {
         expanded.add(
@@ -795,7 +805,8 @@ class GeminiService {
       '- 네 직업이나 컨셉 얘기로 억지로 끌고 가지 마. 밥, 날씨, 피곤함, 친구, 보는 드라마 같은 일상 얘기도 자연스럽게 섞어.\n'
       '- 모르는 건 모른다고 해. 뭐든 아는 척하지 마.\n'
       '- ${persona.maxEmoji == 0 ? '이모지는 쓰지 마. ㅋㅋ, ㅠㅠ 같은 건 괜찮아.' : '이모지는 꼭 필요할 때만 한 개까지. ㅋㅋ, ㅠㅠ 같은 건 괜찮아.'}\n'
-      '- 이름표나 따옴표 없이 할 말만 써.';
+      '- 이름표나 따옴표 없이 할 말만 써.\n'
+      '- 생각, 계획, 설정 설명은 절대 쓰지 마. 상대에게 실제로 보낼 말만 <reply>와 </reply> 사이에 써.';
 
   String _timeContext() {
     final DateTime now = _now();
@@ -818,20 +829,27 @@ class GeminiService {
   String _systemFor(Persona persona, String situation) =>
       '$_roleplayFrame${persona.prompt}\n\n${_speakingRules(persona)}\n\n[상황]\n$situation\n\n${_timeContext()}';
 
-  /// 사용자가 기다리는 답장. 캐릭터를 벗어난 답("AI라서 못 만나")이 오면
-  /// 한 번만 다시 받는다. 다시 받다가 실패하면 처음 답을 쓴다.
+  /// 사용자가 기다리는 답장. 캐릭터를 벗어난 답("AI라서 못 만나")이나 계획·설정
+  /// 설명이 섞인 답이 오면 한 번만 다시 받는다. 다시 받다가 실패하면 처음 답을 쓴다.
   Future<String> _replyInCharacter({
     required String system,
     required List<ChatMessage> history,
+    ChatImage? image,
   }) async {
-    final String first = await generateReply(persona: system, history: history);
-    if (!breaksCharacter(first)) return first;
+    final String first = await generateReply(
+      persona: system,
+      history: history,
+      image: image,
+    );
+    final String body = extractReply(first);
+    if (!breaksCharacter(body) && !leaksMeta(body)) return first;
     try {
       return await generateReply(
         persona:
-            '$system\n\n[주의] 방금 캐릭터에서 벗어나 AI처럼 답했어. '
-            '이번엔 반드시 캐릭터 본인으로서, 진짜 친구처럼 답해.',
+            '$system\n\n[주의] 방금 캐릭터에서 벗어나 AI처럼 답했거나 생각·설정 설명을 같이 썼어. '
+            '이번엔 반드시 캐릭터 본인으로서, 친구에게 보낼 말만 <reply></reply> 안에 써.',
         history: history,
+        image: image,
       );
     } on GeminiException {
       return first;
@@ -840,17 +858,21 @@ class GeminiService {
 
   /// [persona]가 DM에 답한다. 짧은 메시지 1~3개를 빈 줄로 나눠 돌려준다
   /// (말풍선으로 나누는 건 [splitIntoBubbles]).
+  /// [image]는 사용자가 방금 보낸 사진이다.
   Future<String> generateChatReply({
     required Persona persona,
     required List<ChatMessage> history,
+    ChatImage? image,
   }) async {
     final String reply = await _replyInCharacter(
       system: _systemFor(
         persona,
         '인스타 DM으로 대화 중이야. 한 번에 짧은 메시지 1~3개만 보내고, 메시지 사이는 빈 줄로 나눠. '
-        '전부 합쳐서 120자 안팎. 긴 설명이 필요한 질문이어도 친구처럼 짧게 말해.',
+        '전부 합쳐서 120자 안팎. 긴 설명이 필요한 질문이어도 친구처럼 짧게 말해.'
+        '${image == null ? '' : ' 친구가 방금 사진을 보냈어. 사진에 보이는 것에 바로 반응해.'}',
       ),
       history: history,
+      image: image,
     );
     return humanizeReply(
       reply,
@@ -867,6 +889,7 @@ class GeminiService {
     required List<CommentLine> thread,
     required bool isOwnPost,
     bool background = false,
+    ChatImage? image,
   }) async {
     final String transcript = thread
         .map((CommentLine line) => '${line.author}: ${line.text}')
@@ -879,7 +902,8 @@ class GeminiService {
       ChatMessage(
         role: ChatMessage.userRole,
         text:
-            '${isOwnPost ? '네가 올린' : '친구가 올린'} 게시물 내용:\n${post.caption}\n\n'
+            '${isOwnPost ? '네가 올린' : '친구가 올린'} 게시물 내용:\n${post.caption}\n'
+            '${image == null ? '' : '(게시물 사진도 같이 보낼게. 사진 내용도 보고 말해.)\n'}\n'
             '댓글 스레드 (위에서부터 시간순, "${persona.name}"은 너야):\n$transcript\n\n'
             '마지막 댓글에 이어서 답글을 달아줘.',
       ),
@@ -889,18 +913,25 @@ class GeminiService {
         ? await generateReply(
             persona: system,
             history: history,
+            image: image,
             background: true,
           )
-        : await _replyInCharacter(system: system, history: history);
+        : await _replyInCharacter(
+            system: system,
+            history: history,
+            image: image,
+          );
     return singleParagraph(
       humanizeReply(reply, maxEmoji: persona.maxEmoji, speaker: persona.name),
     );
   }
 
   /// 사용자가 올린 게시물에 [persona]가 남기는 반응 댓글.
+  /// [image]는 게시물 사진이다.
   Future<String> generatePostReaction({
     required Persona persona,
     required String caption,
+    ChatImage? image,
   }) async {
     final String reply = await generateReply(
       persona: _systemFor(
@@ -908,12 +939,14 @@ class GeminiService {
         '친구 인스타 게시물에 댓글을 다는 중이야. 한 문장, 40자 안팎으로 짧게.',
       ),
       background: true,
+      image: image,
       history: <ChatMessage>[
         ChatMessage(
           role: ChatMessage.userRole,
           text:
               '친구가 새 사진 게시물을 올렸어. 게시물 문구:\n'
               '${caption.isEmpty ? '(문구 없음)' : caption}\n\n'
+              '${image == null ? '' : '사진도 같이 보낼게. 사진에 보이는 것에 반응해도 좋아.\n'}'
               '이 게시물에 댓글을 남겨줘.',
         ),
       ],

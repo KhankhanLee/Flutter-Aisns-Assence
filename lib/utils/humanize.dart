@@ -8,7 +8,7 @@ import 'package:characters/characters.dart';
 ///
 /// ㅋㅋ·ㅠㅠ 같은 글자, 해시태그, 문단 사이 빈 줄은 그대로 둔다.
 String humanizeReply(String text, {required int maxEmoji, String? speaker}) {
-  String out = text.replaceAll('\r\n', '\n');
+  String out = stripMetaLines(extractReply(text.replaceAll('\r\n', '\n')));
 
   out = out
       .replaceAllMapped(
@@ -51,6 +51,46 @@ String humanizeReply(String text, {required int maxEmoji, String? speaker}) {
       .replaceAll(RegExp(r' +\n'), '\n')
       .replaceAll(RegExp(r'\n{3,}'), '\n\n')
       .trim();
+}
+
+/// 모델에게 보낼 말만 `<reply>…</reply>` 안에 쓰게 한다. 태그가 있으면 그 안만,
+/// 없으면 전체를 쓰고 남은 태그 조각은 지운다.
+String extractReply(String text) {
+  final Iterable<RegExpMatch> tagged = RegExp(
+    r'<reply>([\s\S]*?)(?:</reply>|$)',
+  ).allMatches(text);
+  final String body = tagged.isEmpty
+      ? text
+      : tagged.map((RegExpMatch m) => m.group(1)!.trim()).join('\n\n');
+  return body.replaceAll(RegExp(r'</?reply>'), '').trim();
+}
+
+/// 답에 "지은이로서 짧게 답글 달기. … 설정 유지." 같은 계획·설정 설명이 섞였는지.
+bool leaksMeta(String text) => _metaPatterns.any(text.contains);
+
+final List<Pattern> _metaPatterns = <Pattern>[
+  RegExp(r'로서\s*\S*\s*(짧게\s*)?(답글|답장|댓글|대답)\s*(달기|하기|쓰기)'),
+  RegExp(r'(설정|캐릭터|톤)(을|를)?\s*유지'),
+  RegExp(r'느낌으로\s*[.)]'),
+  RegExp(r'사용자(가|에게|의|를)\s'),
+  '캐릭터로서',
+  '(답변)',
+];
+
+/// 앞쪽의 계획·설정 설명 문장을 잘라 낸다. 전부 그런 문장이면 그대로 둔다.
+String stripMetaLines(String text) {
+  final List<String> sentences = text
+      .split(RegExp(r'(?<=[.!?])\s+|\n+'))
+      .where((String s) => s.trim().isNotEmpty)
+      .toList();
+  int first = 0;
+  while (first < sentences.length && leaksMeta(sentences[first])) {
+    first++;
+  }
+  if (first == 0 || first == sentences.length) return text;
+  final String rest = sentences.sublist(first).join(' ');
+  final int at = text.indexOf(sentences[first]);
+  return at < 0 ? rest : text.substring(at).trim();
 }
 
 /// 캐릭터를 벗어나 "AI라서 만날 수 없어"처럼 답했는지.

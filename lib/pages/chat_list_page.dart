@@ -175,7 +175,9 @@ class _ConversationTile extends StatelessWidget {
     if (chat.errorOf(persona.id) != null) return '전송 실패 · 눌러서 다시 시도';
     final ChatMessage? last = chat.lastMessageOf(persona.id);
     if (last == null) return persona.bio;
-    final String text = last.text.replaceAll('\n', ' ');
+    final String text = last.text.isEmpty && last.imagePath != null
+        ? '사진을 보냈어요'
+        : last.text.replaceAll('\n', ' ');
     return '${last.isUser ? '나: ' : ''}$text';
   }
 

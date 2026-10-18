@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:assence/models/chat_message.dart';
 import 'package:assence/models/persona.dart';
 import 'package:assence/models/story.dart';
 import 'package:assence/navigation.dart';
+import 'package:assence/services/media_storage.dart';
 import 'package:assence/state/ai_settings_store.dart';
 import 'package:assence/state/chat_store.dart';
 import 'package:assence/state/persona_store.dart';
@@ -16,7 +18,10 @@ import 'package:assence/widgets/author_avatar.dart';
 class ChatRoomPage extends StatefulWidget {
   final String personaId;
 
-  const ChatRoomPage({super.key, required this.personaId});
+  /// 보낼 사진 고르기. 테스트에서 바꿔 끼운다.
+  final PhotoPicker? pickPhoto;
+
+  const ChatRoomPage({super.key, required this.personaId, this.pickPhoto});
 
   @override
   State<ChatRoomPage> createState() => _ChatRoomPageState();
@@ -26,6 +31,9 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   int _lastRenderedCount = -1;
+
+  /// 보내려고 고른 사진. 보내거나 취소하면 null.
+  String? _photo;
 
   @override
   void initState() {
@@ -40,11 +48,29 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     super.dispose();
   }
 
+  bool get _canSend => _controller.text.trim().isNotEmpty || _photo != null;
+
   void _send(ChatStore chat) {
     final String text = _controller.text;
-    if (text.trim().isEmpty || chat.isPending(widget.personaId)) return;
+    if (!_canSend || chat.isPending(widget.personaId)) return;
+    final String? photo = _photo;
     _controller.clear();
-    chat.send(widget.personaId, text);
+    setState(() => _photo = null);
+    chat.send(widget.personaId, text, imagePath: photo);
+  }
+
+  Future<void> _pickPhoto() async {
+    final PhotoPicker pick =
+        widget.pickPhoto ?? devicePhotoPicker(folder: 'dm_photos');
+    try {
+      final String? path = await pick(ImageSource.gallery);
+      if (path != null && mounted) setState(() => _photo = path);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('사진을 가져오지 못했어요. 권한을 확인해 주세요.')),
+      );
+    }
   }
 
   /// 메시지 수가 바뀌면 다음 프레임에 맨 아래로 스크롤한다.
@@ -158,6 +184,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                             : humanizeReply(message.text, maxEmoji: 99),
                         isUser: message.isUser,
                         personaId: persona.id,
+                        imagePath: message.imagePath,
                         story: message.story,
                         storyLabel: message.isUser
                             ? '${persona.name}님의 스토리에 답장함'
@@ -185,12 +212,54 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                 ],
               ),
             ),
+          if (_photo != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Stack(
+                  children: <Widget>[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: AppImage(
+                        _photo!,
+                        width: 90,
+                        height: 90,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: IconButton(
+                        visualDensity: VisualDensity.compact,
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.black54,
+                        ),
+                        icon: const Icon(
+                          Icons.close,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                        tooltip: '사진 빼기',
+                        onPressed: () => setState(() => _photo = null),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           SafeArea(
             top: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(12.0, 4.0, 4.0, 10.0),
+              padding: const EdgeInsets.fromLTRB(4.0, 4.0, 4.0, 10.0),
               child: Row(
                 children: <Widget>[
+                  IconButton(
+                    icon: const Icon(Icons.photo_outlined),
+                    tooltip: '사진 보내기',
+                    onPressed: pending ? null : _pickPhoto,
+                  ),
                   Expanded(
                     child: TextField(
                       controller: _controller,
@@ -217,9 +286,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                   IconButton(
                     icon: const Icon(Icons.send),
                     tooltip: '보내기',
-                    onPressed: pending || _controller.text.trim().isEmpty
-                        ? null
-                        : () => _send(chat),
+                    onPressed: pending || !_canSend ? null : () => _send(chat),
                   ),
                 ],
               ),
@@ -307,6 +374,7 @@ class _Bubble extends StatelessWidget {
   final String personaId;
   final SharedStory? story;
   final String storyLabel;
+  final String? imagePath;
 
   const _Bubble({
     required this.text,
@@ -314,11 +382,14 @@ class _Bubble extends StatelessWidget {
     required this.personaId,
     this.story,
     this.storyLabel = '',
+    this.imagePath,
   });
 
   @override
   Widget build(BuildContext context) {
     final SharedStory? shared = story;
+    final String? photo = imagePath;
+    final double width = MediaQuery.sizeOf(context).width;
     final Widget textBubble = Container(
       constraints: BoxConstraints(
         maxWidth: MediaQuery.sizeOf(context).width * 0.7,
@@ -333,8 +404,32 @@ class _Bubble extends StatelessWidget {
         style: TextStyle(color: isUser ? Colors.white : Colors.black),
       ),
     );
-    final Widget bubble = shared == null
+    // 사진 메시지: 사진을 먼저, 글이 있으면 그 아래에 말풍선.
+    final Widget body = photo == null
         ? textBubble
+        : Column(
+            crossAxisAlignment: isUser
+                ? CrossAxisAlignment.end
+                : CrossAxisAlignment.start,
+            children: <Widget>[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: width * 0.6,
+                    maxHeight: width * 0.8,
+                  ),
+                  child: AppImage(photo, fit: BoxFit.cover),
+                ),
+              ),
+              if (text.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 4),
+                textBubble,
+              ],
+            ],
+          );
+    final Widget bubble = shared == null
+        ? body
         : Column(
             crossAxisAlignment: isUser
                 ? CrossAxisAlignment.end
@@ -347,7 +442,7 @@ class _Bubble extends StatelessWidget {
               const SizedBox(height: 4),
               _StoryThumb(story: shared),
               const SizedBox(height: 4),
-              textBubble,
+              body,
             ],
           );
 
