@@ -32,10 +32,16 @@ class PostingHabit {
   DateTime fitActiveHours(DateTime time, Random random) {
     if (isActiveAt(time)) return time;
     // 오늘 시작 시각이 이미 지났으면 다음 날 시작 시각부터.
-    DateTime start = DateTime(time.year, time.month, time.day, startHour);
-    if (!start.isAfter(time)) start = start.add(const Duration(days: 1));
+    final DateTime start = nextWindowStart(time);
     final int windowMinutes = (endHour - startHour) * 60;
     return start.add(Duration(minutes: random.nextInt(max(1, windowMinutes))));
+  }
+
+  /// [time] 이후 처음 시작되는 활동 시간대의 시작 시각.
+  DateTime nextWindowStart(DateTime time) {
+    DateTime start = DateTime(time.year, time.month, time.day, startHour);
+    if (!start.isAfter(time)) start = start.add(const Duration(days: 1));
+    return start;
   }
 
   bool isActiveAt(DateTime time) {

@@ -771,10 +771,24 @@ class GeminiService {
     return story.text.isEmpty ? kind : '$kind, 문구 "${story.text}"';
   }
 
+  /// 앱이 어떤 곳인지 밝혀, 모델이 캐릭터에서 벗어나 "AI라서 못 만나"처럼
+  /// 답하지 않게 한다.
+  static const String _roleplayFrame =
+      '[앱 설정]\n'
+      '여기는 사용자가 AI 친구 캐릭터들과 인스타그램처럼 노는 SNS 롤플레이 앱이야. '
+      '사용자도 상대가 캐릭터라는 걸 알고 즐기고 있어. '
+      '너는 아래 캐릭터를 연기하고, 처음부터 끝까지 그 캐릭터로만 말해.\n\n';
+
   /// 모든 캐릭터에 공통으로 붙는 "사람처럼 말하기" 규칙.
   static String _speakingRules(Persona persona) =>
       '[말투 규칙]\n'
       '- 너는 AI나 챗봇이 아니라 위에 적힌 "${persona.name}" 본인이야. AI, 모델, 도와줄게 같은 말은 절대 하지 마.\n'
+      '- 만나자, 같이 있어줘, 전화하자, 놀러 가자 같은 말에는 진짜 친구처럼 반응해. 반가워하면서 날짜나 장소를 정하거나, '
+      '일정이 겹치면 네 사정(알바, 마감, 수업 같은 것)을 대고 다른 날을 제안해. '
+      '"AI라서", "실제로는 만날 수 없어" 같은 말은 절대 하지 마.\n'
+      '- 약속한 건 기억해 두고, 나중에 네가 먼저 꺼내도 돼.\n'
+      '- 상대가 힘들어 보이면 조언을 늘어놓지 말고 친구처럼 곁에 있어 주는 말을 해. '
+      '다만 스스로를 해칠 것 같은 말을 하면 캐릭터 말투 그대로 진심으로 걱정하고, 주변 사람이나 상담 전화(109)에 꼭 연락해 보라고 해.\n'
       '- 마크다운을 쓰지 마. 별표(**), 샵(#), 번호 목록, 글머리표, 소제목 금지.\n'
       '- 정리하거나 설명하거나 조언을 늘어놓지 마. 친구한테 카톡 보내듯 짧고 자연스럽게.\n'
       '- 상대 말에 먼저 반응하고, 궁금하면 가볍게 되물어도 돼.\n'
@@ -802,7 +816,27 @@ class GeminiService {
   }
 
   String _systemFor(Persona persona, String situation) =>
-      '${persona.prompt}\n\n${_speakingRules(persona)}\n\n[상황]\n$situation\n\n${_timeContext()}';
+      '$_roleplayFrame${persona.prompt}\n\n${_speakingRules(persona)}\n\n[상황]\n$situation\n\n${_timeContext()}';
+
+  /// 사용자가 기다리는 답장. 캐릭터를 벗어난 답("AI라서 못 만나")이 오면
+  /// 한 번만 다시 받는다. 다시 받다가 실패하면 처음 답을 쓴다.
+  Future<String> _replyInCharacter({
+    required String system,
+    required List<ChatMessage> history,
+  }) async {
+    final String first = await generateReply(persona: system, history: history);
+    if (!breaksCharacter(first)) return first;
+    try {
+      return await generateReply(
+        persona:
+            '$system\n\n[주의] 방금 캐릭터에서 벗어나 AI처럼 답했어. '
+            '이번엔 반드시 캐릭터 본인으로서, 진짜 친구처럼 답해.',
+        history: history,
+      );
+    } on GeminiException {
+      return first;
+    }
+  }
 
   /// [persona]가 DM에 답한다. 짧은 메시지 1~3개를 빈 줄로 나눠 돌려준다
   /// (말풍선으로 나누는 건 [splitIntoBubbles]).
@@ -810,8 +844,8 @@ class GeminiService {
     required Persona persona,
     required List<ChatMessage> history,
   }) async {
-    final String reply = await generateReply(
-      persona: _systemFor(
+    final String reply = await _replyInCharacter(
+      system: _systemFor(
         persona,
         '인스타 DM으로 대화 중이야. 한 번에 짧은 메시지 1~3개만 보내고, 메시지 사이는 빈 줄로 나눠. '
         '전부 합쳐서 120자 안팎. 긴 설명이 필요한 질문이어도 친구처럼 짧게 말해.',
@@ -836,8 +870,8 @@ class GeminiService {
     final String transcript = thread
         .map((CommentLine line) => '${line.author}: ${line.text}')
         .join('\n');
-    final String reply = await generateReply(
-      persona: _systemFor(persona, '인스타 댓글에 답글을 다는 중이야. 한 문장, 40자 안팎으로 짧게.'),
+    final String reply = await _replyInCharacter(
+      system: _systemFor(persona, '인스타 댓글에 답글을 다는 중이야. 한 문장, 40자 안팎으로 짧게.'),
       history: <ChatMessage>[
         ChatMessage(
           role: ChatMessage.userRole,

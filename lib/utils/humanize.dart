@@ -53,6 +53,31 @@ String humanizeReply(String text, {required int maxEmoji, String? speaker}) {
       .trim();
 }
 
+/// 캐릭터를 벗어나 "AI라서 만날 수 없어"처럼 답했는지.
+/// IT 얘기에서 AI를 언급하는 건 괜찮으므로, 자기 자신을 AI로 말하는 표현만 본다.
+bool breaksCharacter(String text) {
+  const List<String> phrases = <String>[
+    'AI라서',
+    'AI이기 때문',
+    '저는 AI',
+    '나는 AI',
+    '난 AI',
+    'AI인 저',
+    'AI인 나',
+    '인공지능이라',
+    '인공지능이기',
+    '언어 모델',
+    '언어모델',
+    '챗봇이라',
+    '실제로 만날 수',
+    '직접 만날 수',
+    '실제로는 만날',
+    '물리적으로',
+    '화면 밖으로',
+  ];
+  return phrases.any(text.contains);
+}
+
 /// 한 문단짜리 댓글로 만든다 (줄바꿈을 공백으로).
 String singleParagraph(String text) =>
     text.replaceAll(RegExp(r'\s*\n\s*'), ' ').trim();

@@ -78,7 +78,7 @@ void main() {
       );
     });
 
-    test('예전에 저장된 스토리(조회 정보 없음)도 읽힌다', () async {
+    test('예전에 저장된 스토리(조회 정보 없음)도 읽히고, 지금부터 조회 일정을 만든다', () async {
       final LocalStore local = await openTestStore(<String, Object>{
         'my_stories': jsonEncode(<dynamic>[
           <String, String>{
@@ -91,7 +91,42 @@ void main() {
         ]),
       });
       final StoryStore store = StoryStore(local);
-      expect(store.myActiveStories.single.views, isEmpty);
+      final Story story = store.myActiveStories.single;
+      expect(story.text, '옛날 스토리');
+      expect(story.views, isNotEmpty);
+      // 보정한 일정은 다시 열어도 그대로다.
+      expect(
+        StoryStore(local).myActiveStories.single.views.length,
+        story.views.length,
+      );
+    });
+
+    test('활동 중인 친구가 있을 때 올리면 20분 안에 최소 한 명은 본다', () async {
+      for (int seed = 0; seed < 50; seed++) {
+        DateTime now = DateTime(2026, 10, 17, 15); // 모두 활동 중인 시간은 아니어도 일부는 활동 중
+        final StoryStore store = StoryStore(
+          await openTestStore(),
+          now: () => now,
+          random: Random(seed),
+        );
+        final Story story = store.addMyStory(imagePath: '', text: '오후');
+        now = now.add(const Duration(minutes: 20));
+        expect(store.viewersOf(story), isNotEmpty, reason: 'seed $seed');
+      }
+    });
+
+    test('모두 쉬는 시간(새벽 3시)에 올리면 각자 활동 시간이 시작된 뒤에 본다', () async {
+      final DateTime posted = DateTime(2026, 10, 17, 3);
+      final StoryStore store = StoryStore(
+        await openTestStore(),
+        now: () => posted,
+        random: Random(1),
+      );
+      final Story story = store.addMyStory(imagePath: '', text: '잠이 안 와');
+      for (final StoryView view in story.views) {
+        final int start = personaHabits[view.personaId]!.startHour;
+        expect(view.at.hour, inInclusiveRange(start, start + 1));
+      }
     });
 
     test('친구 스토리 좋아요는 눌렀다 취소할 수 있고 다시 열어도 유지된다', () async {

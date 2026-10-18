@@ -169,7 +169,7 @@ void main() {
     expect(reply, '고마워요!');
     final String systemText =
         body['system_instruction']['parts'][0]['text'] as String;
-    expect(systemText, startsWith(seedPersonas.first.prompt));
+    expect(systemText, contains(seedPersonas.first.prompt));
     final String userText = body['contents'][0]['parts'][0]['text'] as String;
     expect(userText, contains('라떼 맛있어 보여요'));
     // 스레드 전체가 순서대로 들어가야 AI가 대화를 이어갈 수 있다.
@@ -394,7 +394,7 @@ void main() {
 
       final String system =
           body['system_instruction']['parts'][0]['text'] as String;
-      expect(system, startsWith(jieun.prompt));
+      expect(system, contains(jieun.prompt));
       expect(system, contains('마크다운을 쓰지 마'));
       expect(system, contains('이모지는 쓰지 마'));
       expect(system, contains('10월 16일 금요일 저녁 21시쯤'));

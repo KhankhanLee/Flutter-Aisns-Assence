@@ -43,6 +43,27 @@ class StoryStore extends ChangeNotifier {
     }
     final Object? liked = _local.readJson(_likedKey);
     if (liked is List<dynamic>) _liked.addAll(liked.cast<String>());
+    _planMissingViews();
+  }
+
+  /// 조회 일정이 생기기 전 버전에서 올린 스토리에도 지금부터 일정을 만든다.
+  void _planMissingViews() {
+    final DateTime now = _now();
+    bool changed = false;
+    for (int i = 0; i < _myStories.length; i++) {
+      final Story story = _myStories[i];
+      if (story.views.isNotEmpty || !story.isActive(now)) continue;
+      _myStories[i] = Story(
+        id: story.id,
+        authorId: story.authorId,
+        imagePath: story.imagePath,
+        text: story.text,
+        createdAt: story.createdAt,
+        views: _planViews(story.createdAt, from: now),
+      );
+      changed = true;
+    }
+    if (changed) _save();
   }
 
   /// 24시간이 지나지 않은 내 스토리.
@@ -91,15 +112,39 @@ class StoryStore extends ChangeNotifier {
   }
 
   /// 스토리를 올린 순간 페르소나별로 언제 볼지, 좋아요를 누를지, DM을 보낼지 정한다.
-  /// 각자 활동 시간에 맞춰 몇 분~몇 시간에 걸쳐 띄엄띄엄 본다.
-  List<StoryView> _planViews(DateTime created) {
+  /// 실제 SNS처럼 지금 활동 중인 친구는 대부분 몇 분 안에 보고(그중 한 명은 꼭 본다),
+  /// 활동 시간이 아닌 친구는 다음 활동 시간이 시작되고 얼마 뒤에 본다.
+  /// [from]은 일정을 짜기 시작하는 시각 (예전 스토리를 보정할 때는 지금).
+  List<StoryView> _planViews(DateTime created, {DateTime? from}) {
+    final DateTime start = from ?? created;
     final DateTime expires = created.add(Story.lifetime);
+    bool activeNow(Persona p) => personaHabits[p.id]?.isActiveAt(start) ?? true;
+    final List<Persona> active = seedPersonas.where(activeNow).toList();
+    final String? sureViewer = active.isEmpty
+        ? null
+        : active[_random.nextInt(active.length)].id;
+
     final List<StoryView> views = <StoryView>[];
     for (final Persona persona in seedPersonas) {
-      if (_random.nextDouble() >= viewChance) continue;
-      DateTime at = created.add(Duration(minutes: 3 + _random.nextInt(237)));
+      final bool sure = persona.id == sureViewer;
+      if (!sure && _random.nextDouble() >= viewChance) continue;
       final PostingHabit? habit = personaHabits[persona.id];
-      if (habit != null) at = habit.fitActiveHours(at, _random);
+      final DateTime at;
+      if (habit == null || habit.isActiveAt(start)) {
+        // 대부분 처음 10분 안 (평균 6분 지수분포, 2~20분). 일부는 한참 뒤에 본다.
+        if (sure || _random.nextDouble() < 0.7) {
+          final double minutes = (2 - 6 * log(1 - _random.nextDouble()))
+              .clamp(2, 20)
+              .toDouble();
+          at = start.add(Duration(seconds: (minutes * 60).round()));
+        } else {
+          at = start.add(Duration(minutes: 20 + _random.nextInt(220)));
+        }
+      } else {
+        at = habit
+            .nextWindowStart(start)
+            .add(Duration(minutes: _random.nextInt(60)));
+      }
       if (!at.isBefore(expires)) continue;
       views.add(
         StoryView(
