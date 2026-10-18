@@ -39,11 +39,15 @@ class ChatMessage {
   /// 이 메시지가 답하는 스토리. 없으면 일반 메시지.
   final SharedStory? story;
 
+  /// 함께 보낸 사진(기기 파일 경로). 사진만 보냈으면 [text]는 빈 문자열.
+  final String? imagePath;
+
   ChatMessage({
     required this.role,
     required this.text,
     DateTime? createdAt,
     this.story,
+    this.imagePath,
   }) : createdAt = createdAt ?? DateTime.now();
 
   bool get isUser => role == userRole;
@@ -55,6 +59,7 @@ class ChatMessage {
     story: json['story'] is Map<String, dynamic>
         ? SharedStory.fromJson(json['story'] as Map<String, dynamic>)
         : null,
+    imagePath: json['imagePath'] as String?,
   );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -62,5 +67,6 @@ class ChatMessage {
     'text': text,
     'createdAt': createdAt.toIso8601String(),
     if (story != null) 'story': story!.toJson(),
+    if (imagePath != null) 'imagePath': imagePath,
   };
 }

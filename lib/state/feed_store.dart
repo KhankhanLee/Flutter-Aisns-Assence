@@ -7,6 +7,7 @@ import 'package:assence/models/comment.dart';
 import 'package:assence/models/persona.dart';
 import 'package:assence/models/post.dart';
 import 'package:assence/services/gemini_service.dart';
+import 'package:assence/services/image_bytes.dart';
 import 'package:assence/services/local_store.dart';
 import 'package:assence/services/post_image_source.dart';
 import 'package:assence/state/ai_budget.dart';
@@ -54,6 +55,9 @@ class FeedStore extends ChangeNotifier {
   /// 페르소나 ID → 다음 게시 예정 시각.
   final Map<String, DateTime> _nextPostAt = <String, DateTime>{};
   DateTime? _imageDisabledUntil;
+
+  /// 게시물 사진을 AI 요청용으로 읽는다. 테스트에서는 바꿔 끼운다.
+  Future<ChatImage?> Function(String path) imageLoader = loadChatImage;
 
   FeedStore(
     this._local,
@@ -222,11 +226,16 @@ class FeedStore extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // 내 게시물은 AI가 사진을 직접 보고 말하게 한다
+      // (페르소나 게시물은 사진 내용이 이미 캡션에 들어 있다).
       final String text = await _gemini.generateCommentReply(
         persona: responder,
         post: post,
         thread: _threadUntil(post, comment),
         isOwnPost: post.authorId == responder.id,
+        image: post.authorId == myUserId
+            ? await imageLoader(post.imagePath)
+            : null,
       );
       post.comments.add(
         Comment(
@@ -564,11 +573,13 @@ class FeedStore extends ChangeNotifier {
 
     final List<Persona> reactors = List<Persona>.of(seedPersonas)
       ..shuffle(_random);
+    final ChatImage? photo = await imageLoader(post.imagePath);
     for (final Persona persona in reactors.take(_reactionCount)) {
       try {
         final String text = await _gemini.generatePostReaction(
           persona: persona,
           caption: post.caption,
+          image: photo,
         );
         post.comments.add(
           Comment(

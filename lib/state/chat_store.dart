@@ -123,9 +123,15 @@ class ChatStore extends ChangeNotifier {
   }
 
   /// [story]를 주면 그 스토리에 대한 답장으로 보낸다.
-  Future<void> send(String personaId, String text, {Story? story}) async {
+  /// [imagePath]를 주면 사진을 함께 보낸다. 사진이 있으면 글은 비어도 된다.
+  Future<void> send(
+    String personaId,
+    String text, {
+    Story? story,
+    String? imagePath,
+  }) async {
     final String trimmed = text.trim();
-    if (trimmed.isEmpty || isPending(personaId)) return;
+    if ((trimmed.isEmpty && imagePath == null) || isPending(personaId)) return;
 
     _histories
         .putIfAbsent(personaId, () => <ChatMessage>[])
@@ -134,6 +140,7 @@ class ChatStore extends ChangeNotifier {
             role: ChatMessage.userRole,
             text: trimmed,
             story: story?.toShared(),
+            imagePath: imagePath,
           ),
         );
     await _requestReply(personaId);
@@ -257,9 +264,15 @@ class ChatStore extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // 방금 보낸 사진이 있으면 AI가 직접 보고 답하게 한다.
+      final List<ChatMessage> history = historyOf(personaId);
+      final String? photo = history.isNotEmpty && history.last.isUser
+          ? history.last.imagePath
+          : null;
       final String reply = await _gemini.generateChatReply(
         persona: persona,
-        history: historyOf(personaId),
+        history: history,
+        image: photo == null ? null : await imageLoader(photo),
       );
       await _addBubbles(personaId, reply);
     } on GeminiException catch (e) {

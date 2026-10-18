@@ -3,6 +3,7 @@ import 'package:assence/models/chat_message.dart';
 import 'package:assence/services/claude_client.dart';
 import 'package:assence/services/gemini_service.dart';
 import 'package:assence/services/local_store.dart';
+import 'package:assence/utils/humanize.dart';
 
 /// 앱 안에서 입력한 AI 키와 모델, 그리고 지금 쓸 AI(Gemini 또는 Claude).
 ///
@@ -154,7 +155,7 @@ class AiSettingsStore extends ChangeNotifier {
         await _local.writeJson(_claudeKeyStorageKey, key);
       }
       await _local.writeJson(_providerStorageKey, provider.name);
-      return reply;
+      return extractReply(reply);
     } on GeminiException {
       _gemini.provider = previousProvider;
       _gemini.configure(apiKey: previousKey, model: previousModel);
